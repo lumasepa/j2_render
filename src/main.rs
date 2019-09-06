@@ -1,5 +1,6 @@
 #![feature(or_patterns)]
 
+use molysite::hcl::parse_hcl;
 use serde_json;
 use serde_yaml;
 use std::ffi::OsStr;
@@ -21,7 +22,8 @@ mod testers;
 pub fn help() {
     println!(
         "
-renderman [opts]
+j2_render [opts]
+
     --stdin -i [json,yaml,hcl,tfvars,template] read from stdin context or template
     --out [file_path] output file for rendered template, default stdout
     --env -e load env vars in ctx
@@ -32,18 +34,20 @@ renderman [opts]
     )
 }
 
-pub fn parse_args() -> (String, Option<String>, Context) {
+pub fn parse_args() -> (String, Option<String>, bool, Context) {
     let mut args = env::args().collect::<Vec<String>>();
     args.reverse();
 
     let mut template = String::new();
     let mut context = Context::new();
     let mut out = None;
+    let mut print_ctx = false;
 
     args.pop(); // binary name
 
     while let Some(arg) = args.pop() {
         match arg.as_str() {
+            "--print-ctx" | "-p" => print_ctx = true,
             "--out" | "-o" => {
                 let filepath = args
                     .pop()
@@ -93,7 +97,7 @@ pub fn parse_args() -> (String, Option<String>, Context) {
             _ => panic!("Error argument {} not recognized", arg),
         }
     }
-    return (template, out, context);
+    return (template, out, print_ctx, context);
 }
 
 pub fn populate_ctx(context: &mut Context, format: String, data: String) {
@@ -120,14 +124,25 @@ pub fn populate_ctx(context: &mut Context, format: String, data: String) {
                 context.insert(k, v);
             }
         }
-        "hcl" | "tfvars" | "tf" => panic!("Format not already supported"),
+        "hcl" | "tfvars" | "tf" => {
+            let parsed_hcl = parse_hcl(&data).expect("Error parsing hcl/tf/tfvars");
+            let object = value
+                .as_object()
+                .expect("Error expected object in root of hcl/tf/tfvars file");
+            for (k, v) in object.iter() {
+                context.insert(k, v);
+            }
+        }
         _ => panic!("Format {} not recognized", format),
     }
 }
 
 pub fn main() -> std::result::Result<(), String> {
-    let (template, out, context) = parse_args();
+    let (template, out, print_ctx, context) = parse_args();
 
+    if print_ctx {
+        println!()
+    }
     let mut tera = Tera::default();
     tera.add_raw_template("template", &template)
         .expect("Error loading template in engine");
