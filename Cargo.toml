@@ -1,0 +1,21 @@
+[package]
+name = "j2_render"
+version = "0.0.1"
+authors = ["Sergio Medina Toledo <lumasepa@gmail.com>"]
+description = "CLI to render jinja 2 templates, can use files or env vars as context"
+edition = "2018"
+readme = "README.md"
+license = "MIT"
+
+[dependencies]
+tera = "0.11.20"
+serde = "1.0.99"
+toml = "0.5.3"
+serde_json = "1.0.40"
+serde_yaml = "0.8.9"
+glob = "0.3.0"
+base64 = "0.10.1"
+
+[[bin]]
+name = "j2_render"
+path = "src/main.rs"
