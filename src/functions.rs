@@ -23,7 +23,7 @@ pub fn tab_all_lines(args: HashMap<String, Value>) -> Result<Value> {
                 "tab_all_lines: Error number of spaces is not unsigned integer",
             ))? as usize;
             let spaces = " ".repeat(num_spaces);
-            let lines: Vec<_> = lines.split("\n").map(|line| spaces.clone() + line).collect();
+            let lines: Vec<_> = lines.split('\n').map(|line| spaces.clone() + line).collect();
             return Ok(Value::String(lines.join("\n")));
         } else {
             return Err("tab_all_lines: Invalid type for arg num_spaces, expected number".into());

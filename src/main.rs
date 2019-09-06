@@ -28,7 +28,9 @@ j2_render [opts]
     --out [file_path] output file for rendered template, default stdout
     --env -e load env vars in ctx
     --ctx -c [file_path] context files to be loaded in context, multiple files allowed, default empty
+    --var -v key=value adds a pair key value to the context
     --template -t [file_path] template to be rendered, default empty
+    --print-ctx -p print the context as json and exits
     --help shows this help
     "
     )
@@ -48,6 +50,15 @@ pub fn parse_args() -> (String, Option<String>, bool, Context) {
     while let Some(arg) = args.pop() {
         match arg.as_str() {
             "--print-ctx" | "-p" => print_ctx = true,
+            "--var" | "-v" => {
+                let variable = args
+                    .pop()
+                    .expect("error specified --var/-v flag but not value provided");
+                let mut parts : Vec<&str> = variable.split('=').collect();
+                let key = parts.pop().expect("Error no key=value found");
+                let value = parts.join("=");
+                context.insert(&key, &value)
+            }
             "--out" | "-o" => {
                 let filepath = args
                     .pop()
@@ -125,7 +136,9 @@ pub fn populate_ctx(context: &mut Context, format: String, data: String) {
             }
         }
         "hcl" | "tfvars" | "tf" => {
-            let parsed_hcl = parse_hcl(&data).expect("Error parsing hcl/tf/tfvars");
+            let value = parse_hcl(&data).expect("Error parsing hcl/tf/tfvars");
+            let value = value.to_string().parse::<serde_json::Value>().expect("Error parsing json of hcl/tf/tfvars");
+
             let object = value
                 .as_object()
                 .expect("Error expected object in root of hcl/tf/tfvars file");
@@ -141,8 +154,10 @@ pub fn main() -> std::result::Result<(), String> {
     let (template, out, print_ctx, context) = parse_args();
 
     if print_ctx {
-        println!()
+        println!("{}", context.as_json().expect("Error encoding ctx as json").to_string());
+        exit(0)
     }
+
     let mut tera = Tera::default();
     tera.add_raw_template("template", &template)
         .expect("Error loading template in engine");

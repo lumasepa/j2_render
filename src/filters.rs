@@ -1,9 +1,3 @@
-//tera
-//--stdin -i json,yaml,hcl,tfvars,template
-//--env -e load env vars in ctx
-//--ctx -c file_path [format] multiple files allowed
-//--template -t file_path
-
 use crate::inners::exec_cmd;
 use base64;
 use glob::glob;
@@ -11,7 +5,7 @@ use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
 use std::process::Command;
-use tera::{Error, Result, Value};
+use tera::{Result, Value};
 
 pub fn bash(piped_arg: Value, args: HashMap<String, Value>) -> Result<Value> {
     let data = if let Value::String(data) = piped_arg {
@@ -134,7 +128,7 @@ pub fn strip_line_breaks(piped_arg: Value, _: HashMap<String, Value>) -> Result<
 
 pub fn remove_extension(piped_arg: Value, _: HashMap<String, Value>) -> Result<Value> {
     if let Value::String(filename) = piped_arg {
-        let mut parts: Vec<_> = filename.split(".").collect();
+        let mut parts: Vec<_> = filename.split('.').collect();
         parts.pop();
         let filename = parts.join(".");
         return Ok(Value::String(filename));
@@ -158,7 +152,7 @@ pub fn b64decode(piped_arg: Value, _: HashMap<String, Value>) -> Result<Value> {
             .map_err(|e| format!("b64decode: decoding error : {}", e).into())
             .and_then(|decoded_data| {
                 String::from_utf8(decoded_data)
-                    .map(|decode_data| Value::String(decode_data))
+                    .map(Value::String)
                     .map_err(|e| format!("b64decode: utf8 decoding error : {}", e).into())
             });
     } else {

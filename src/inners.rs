@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::process::Command;
 use tera::{Result, Value};
 
-pub fn exec_cmd(command: &mut Command, cmd_str: &String, env: &HashMap<String, Value>) -> Result<Value> {
+pub fn exec_cmd(command: &mut Command, cmd_str: &str, env: &HashMap<String, Value>) -> Result<Value> {
     for (k, v) in env.iter() {
         let value = if let Value::String(data) = v {
             data

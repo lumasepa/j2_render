@@ -15,7 +15,7 @@ serde_json = "1.0.40"
 serde_yaml = "0.8.9"
 glob = "0.3.0"
 base64 = "0.10.1"
-molysite = ""
+molysite = { git = "https://github.com/evq/molysite" }
 
 [[bin]]
 name = "j2_render"
