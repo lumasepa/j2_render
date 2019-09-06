@@ -19,51 +19,82 @@ mod functions;
 mod inners;
 mod testers;
 
+pub struct Config {
+    pub template: String,
+    pub context: Context,
+    pub out_file: Option<String>,
+    pub print_ctx: bool,
+}
+
 pub fn help() {
     println!(
         "
-j2_render [opts]
+j2_render [FLAGS]
 
-    --stdin -i [json,yaml,hcl,tfvars,template] read from stdin context or template
-    --out [file_path] output file for rendered template, default stdout
-    --env -e load env vars in ctx
-    --ctx -c [file_path] context files to be loaded in context, multiple files allowed, default empty
-    --var -v key=value adds a pair key value to the context
-    --template -t [file_path] template to be rendered, default empty
-    --print-ctx -p print the context as json and exits
-    --help shows this help
+    OPTIONS:
+
+        FORMATS = json,yaml,hcl,tfvars,tf,template,j2,tpl
+        FILE_PATH = file_path.FORMAT or FORMAT+file_path   -- path to a file ctx, template or output
+        VAR = key=value or FORMAT+key=value   -- if format provided value will be parsed as format
+
+    FLAGS:
+
+    --stdin/-i FORMAT   -- read from stdin context or template
+    --out/-o file_path   -- output file for rendered template, default stdout
+    --env/-e    -- load env vars in ctx
+    --file/-f FILE_PATH   -- loads a file as context or template depending on extension or format
+    --var/-v VAR   -- adds a pair key value to the context or a template depending on format
+    --print-ctx/-p   -- print the context as json and exits
+    --help/-h   -- shows this help
     "
     )
 }
 
-pub fn parse_args() -> (String, Option<String>, bool, Context) {
+fn extract_format(string: &str) -> Option<(String,String)> {
+    let mut parts : Vec<&str>= string.splitn(2, '+').collect();
+    let format = parts.pop().expect("");
+    if parts.len() == 0  {
+        return None
+    }
+    let other = parts.pop().expect("");
+    return Some((format.to_string(), other.to_string()))
+}
+
+pub fn parse_args() -> Config {
     let mut args = env::args().collect::<Vec<String>>();
     args.reverse();
 
-    let mut template = String::new();
-    let mut context = Context::new();
-    let mut out = None;
-    let mut print_ctx = false;
+    let mut config = Config{
+        template: String::new(),
+        context: Context::new(),
+        out_file: None,
+        print_ctx: false
+    };
 
     args.pop(); // binary name
 
     while let Some(arg) = args.pop() {
         match arg.as_str() {
-            "--print-ctx" | "-p" => print_ctx = true,
             "--var" | "-v" => {
                 let variable = args
                     .pop()
                     .expect("error specified --var/-v flag but not value provided");
-                let mut parts : Vec<&str> = variable.split('=').collect();
+                let mut parts : Vec<&str> = variable.splitn(2, '=').collect();
                 let key = parts.pop().expect("Error no key=value found");
-                let value = parts.join("=");
-                context.insert(&key, &value)
+                let value = parts.pop().expect("Error no key=value found");
+
+                if let Some((format, key)) = extract_format(key) {
+                    process_inputs(&mut config, format, value.to_string());
+                } else {
+                    config.context.insert(&key, &value)
+                }
             }
+            "--print-ctx" | "-p" => config.print_ctx = true,
             "--out" | "-o" => {
                 let filepath = args
                     .pop()
                     .expect("error specified --out/-o flag but not file path provided");
-                out = Some(filepath);
+                config.out_file = Some(filepath);
             }
             "--stdin" | "-i" => {
                 let format = args
@@ -71,35 +102,30 @@ pub fn parse_args() -> (String, Option<String>, bool, Context) {
                     .expect("error specified --stdin/-i flag but not format provided");
                 let mut data = String::new();
                 io::stdin().read_to_string(&mut data).expect("Error readinf from stdin");
-                if format == "template" {
-                    template = data
+                process_inputs(&mut config, format, data);
+            }
+            "--file" | "-f" => {
+                let path = args
+                    .pop()
+                    .expect("error specified --file/-f flag but not context file path provided");
+                let (format, path) = if let Some((format, path)) = extract_format(&path) {
+                    (format, path)
                 } else {
-                    populate_ctx(&mut context, format, data);
-                }
+                    let extension = Path::new(&path)
+                        .extension()
+                        .and_then(OsStr::to_str)
+                        .expect("Error no extension found in ctx file");
+                    (extension.to_string(), path)
+                };
+
+                let data = fs::read_to_string(&path).expect(&format!("Error reading context file {}", path));
+                process_inputs(&mut config, format, data);
             }
             "--env" | "-e" => {
                 let env_vars = env::vars().collect::<HashMap<String, String>>();
                 for (k, v) in env_vars.iter() {
-                    context.insert(k, v);
+                    config.context.insert(k, v);
                 }
-            }
-            "--ctx" | "-c" => {
-                let path = args
-                    .pop()
-                    .expect("error specified --ctx/-c flag but not context file path provided");
-                let extension = Path::new(&path)
-                    .extension()
-                    .and_then(OsStr::to_str)
-                    .expect("Error no extension found in ctx file");
-                let data = fs::read_to_string(&path).expect(&format!("Error reading context file {}", path));
-
-                populate_ctx(&mut context, extension.to_string(), data);
-            }
-            "--template" | "-t" => {
-                let path = args
-                    .pop()
-                    .expect("error specified --template/-t flag but not template path provided");
-                template = fs::read_to_string(path).expect("Error reading template")
             }
             "--help" | "help" | "-h" => {
                 help();
@@ -108,7 +134,15 @@ pub fn parse_args() -> (String, Option<String>, bool, Context) {
             _ => panic!("Error argument {} not recognized", arg),
         }
     }
-    return (template, out, print_ctx, context);
+    return config;
+}
+
+pub fn process_inputs(mut config: &mut Config, format: String, data: String) {
+    if format == "template" || format == "tpl" || format == "j2" {
+        config.template = data
+    } else {
+        populate_ctx(&mut config.context, format, data);
+    }
 }
 
 pub fn populate_ctx(context: &mut Context, format: String, data: String) {
@@ -151,7 +185,7 @@ pub fn populate_ctx(context: &mut Context, format: String, data: String) {
 }
 
 pub fn main() -> std::result::Result<(), String> {
-    let (template, out, print_ctx, context) = parse_args();
+    let Config{template, context,print_ctx, out_file } = parse_args();
 
     if print_ctx {
         println!("{}", context.as_json().expect("Error encoding ctx as json").to_string());
@@ -187,7 +221,7 @@ pub fn main() -> std::result::Result<(), String> {
 
     let rendered = tera.render("template", &context).expect("Error rendering template");
 
-    if let Some(filepath) = out {
+    if let Some(filepath) = out_file {
         let mut file = fs::File::create(&filepath).expect("Error creating output file");
         file.write_all(rendered.as_ref()).expect("Error writing to output file");
     } else {
