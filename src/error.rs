@@ -20,6 +20,9 @@ impl WrapError {
         description += "-> Caused By : None";
         WrapError {description: description}
     }
+    pub fn new_first(description: &str)  -> Self {
+        WrapError {description: description.to_string()}
+    }
 }
 
 impl Display for WrapError {

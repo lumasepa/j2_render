@@ -5,6 +5,21 @@ j2_render is a static binary CLI tool to render [jinja 2]() templates, it can lo
 j2_render is writen in rust and uses [tera]() as jinja 2 engine,
 may be some differences between implementations, so look at tera's documentation for reference
 
+## TODO
+
+* json5 input
+* new args format
+* yaml output
+* http input
+* http output
+* k8s input
+* k8s output
+* namespace
+* path
+* as
+* csv input
+* csv output
+
 ## Installation
 
 ```bash 

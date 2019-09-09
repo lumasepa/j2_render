@@ -1,7 +1,31 @@
-use crate::inners::exec_cmd;
+use crate::j2::inners::exec_cmd;
 use std::collections::HashMap;
 use std::process::Command;
-use tera::{Error, Result, Value};
+use tera::{Error, Result, Value, Context};
+use std::fs;
+use crate::j2::tera::tera_render;
+
+pub fn render(args: HashMap<String, Value>) -> Result<Value> {
+    let path = if let Some(Value::String(path)) = args.get("path") {
+        path
+    } else {
+        return Err("render: Invalid type for arg path, expected string".into());
+    };
+    let ctx = if let Some(ctx) = args.get("ctx") {
+        ctx
+    } else {
+        return Err("render: arg ctx not found".into());
+    };
+    let template = match fs::read_to_string(path) {
+        Ok(contents) => contents,
+        Err(e) => return Err(format!("render: error reading file : {:?}", e).into()),
+    };
+    let mut template_ctx = Context::new();
+    template_ctx.insert("ctx", ctx);
+
+    let result = tera_render(template, template_ctx);
+    return Ok(Value::String(result))
+}
 
 pub fn bash(args: HashMap<String, Value>) -> Result<Value> {
     let command = if let Some(Value::String(command)) = args.get("command") {
