@@ -3,6 +3,9 @@
 use molysite::hcl::parse_hcl;
 use serde_json;
 use serde_yaml;
+use tera::{Context, Tera};
+use regex::Regex;
+
 use std::ffi::OsStr;
 use std::io::Write;
 use std::process::exit;
@@ -12,39 +15,161 @@ use std::{
     io::{self, Read},
     path::Path,
 };
-use tera::{Context, Tera};
 
 mod filters;
 mod functions;
 mod inners;
 mod testers;
+mod error;
+
+use crate::error::{ToWrapErrorResult, WrapError};
 
 pub struct Config {
-    pub template: String,
+    pub template: Option<String>,
     pub context: Context,
-    pub out_file: Option<String>,
-    pub print_ctx: bool,
+    pub output: Option<Output>,
+}
+
+struct Pick {
+    name: Option<String>,
+    path: String,
+    namespace: Option<String>
+}
+
+struct Output {
+    format: Option<String>,
+    filepath: Option<String>
+}
+
+struct Input {
+    format: String,
+    picks: Option<Vec<Pick>>,
+    namespace: Option<String>,
+    content: String,
+}
+
+pub fn parse_input_manipulation(mut args: &mut Vec<String>) -> Input {
+    while let Some(arg) = args.pop() {
+        if arg.starts_with("-") {
+            args.push(arg);
+        } else {
+
+        }
+    }
+    panic!()
+}
+
+pub fn parse_output_manipulation(&mut args: &mut Vec<String>) -> Option<Output> {
+    panic!()
+}
+
+
+pub fn parse_args_2() -> Result<Config, WrapError> {
+    let mut args = env::args().collect::<Vec<String>>();
+    args.reverse();
+
+    let mut config = Config{
+        template: None,
+        context: Context::new(),
+        output: None,
+    };
+
+    let mut inputs : Vec<Input> = vec![];
+
+    args.pop(); // binary name
+
+    while let Some(arg) = args.pop() {
+        match arg.as_str() {
+            "--var" | "-v" => {
+                let variable = args
+                    .pop()
+                    .wrap("error specified --var/-v flag but not value provided")?;
+                let mut parts : Vec<&str> = variable.splitn(2, '=').collect();
+                let key = parts.pop().expect("Error no key=value found");
+                let value = parts.pop().expect("Error no key=value found");
+                args.push(format!("value={}", value));
+                args.push(format!("key={}", key));
+                let input = parse_input_manipulation(&mut args);
+                inputs.push(input);
+            }
+            "--out" | "-o" => {
+                config.output = parse_output_manipulation(&mut args);
+            }
+            "--stdin" | "-i" => {
+                let mut value = String::new();
+                io::stdin().read_to_string(&mut value).expect("Error readinf from stdin");
+                args.push(format!("value={}", value));
+                let input = parse_input_manipulation(&mut args);
+                inputs.push(input);
+            }
+            "--file" | "-f" => {
+                let path = args
+                    .pop()
+                    .expect("error specified --file/-f flag but not context file path provided");
+
+                let extension = Path::new(&path)
+                    .extension()
+                    .and_then(OsStr::to_str)
+                    .expect("Error no extension found in ctx file");
+
+                let value = fs::read_to_string(&path).expect(&format!("Error reading context file {}", path));
+
+                args.push(format!("value={}", value));
+                args.push(format!("format={}", extension));
+                let input = parse_input_manipulation(&mut args);
+                inputs.push(input);
+            }
+            "--env" | "-e" => {
+                if let Some(variable_name) =  args.pop(){
+                    let value = env::vars()
+                        .collect::<HashMap<String, String>>()
+                        .get(&variable_name).wrap("Env var expected not found")?;
+                    args.push(format!("value={}", value));
+                } else {
+                    args.push("value=__env__".to_string());
+                }
+
+                let input = parse_input_manipulation(&mut args);
+                inputs.push(input);
+            }
+            "--help" | "help" | "-h" => {
+                help();
+                exit(0);
+            }
+            _ => panic!("Error argument {} not recognized", arg),
+        }
+    }
+
+    return Ok(config);
 }
 
 pub fn help() {
-    println!(
+   println!(
         "
 j2_render [FLAGS]
 
     OPTIONS:
+        SOURCES = file=file_path,stdin,env,value=value,http=url <- auth?
+        DESTINATIONS = http=url,file=file_path,stdout,env
+        FORMATS = json5,json,yaml,hcl,tfvars,tf,template,j2,tpl
+        JMES_PATH = jmespath expression -- http://jmespath.org/tutorial.html
 
-        FORMATS = json,yaml,hcl,tfvars,tf,template,j2,tpl
-        FILE_PATH = file_path.FORMAT or FORMAT+file_path   -- path to a file ctx, template or output
-        VAR = key=value or FORMAT+key=value   -- if format provided value will be parsed as format
+        INPUT_MANIPULATION = source=SOURCE format|f=FORMATS namespace|n=key.key.key path|p=JMES_PATH as=key
+        OUTPUT_MANIPULATION = format|f=FORMATS file=filepath
 
     FLAGS:
 
-    --stdin/-i FORMAT   -- read from stdin context or template
-    --out/-o file_path   -- output file for rendered template, default stdout
-    --env/-e    -- load env vars in ctx
-    --file/-f FILE_PATH   -- loads a file as context or template depending on extension or format
-    --var/-v VAR   -- adds a pair key value to the context or a template depending on format
-    --print-ctx/-p   -- print the context as json and exits
+    Inputs :
+    --input [INPUT_MANIPULATION]
+    --file/-f file_path [INPUT_MANIPULATION]    source=file=file_path format=file_extension
+    --stdin/-i [INPUT_MANIPULATION]             source=stdin
+    --env/-e                                    source=env
+    --env/-e env_var_name [INPUT_MANIPULATION]  source=value=env_var_value namespace=env_var_name
+    --var/-v key=value [INPUT_MANIPULATION]     source=value=value namespace=key
+
+    Output:
+    --out/-o OUTPUT_MANIPULATION
+
     --help/-h   -- shows this help
     "
     )
@@ -65,10 +190,9 @@ pub fn parse_args() -> Config {
     args.reverse();
 
     let mut config = Config{
-        template: String::new(),
+        template: None,
         context: Context::new(),
-        out_file: None,
-        print_ctx: false
+        output: None,
     };
 
     args.pop(); // binary name
@@ -89,7 +213,6 @@ pub fn parse_args() -> Config {
                     config.context.insert(&key, &value)
                 }
             }
-            "--print-ctx" | "-p" => config.print_ctx = true,
             "--out" | "-o" => {
                 let filepath = args
                     .pop()
@@ -139,7 +262,7 @@ pub fn parse_args() -> Config {
 
 pub fn process_inputs(mut config: &mut Config, format: String, data: String) {
     if format == "template" || format == "tpl" || format == "j2" {
-        config.template = data
+        config.template = Some(data)
     } else {
         populate_ctx(&mut config.context, format, data);
     }
@@ -184,14 +307,7 @@ pub fn populate_ctx(context: &mut Context, format: String, data: String) {
     }
 }
 
-pub fn main() -> std::result::Result<(), String> {
-    let Config{template, context,print_ctx, out_file } = parse_args();
-
-    if print_ctx {
-        println!("{}", context.as_json().expect("Error encoding ctx as json").to_string());
-        exit(0)
-    }
-
+pub fn tera_render(template: String, context: Context) -> String {
     let mut tera = Tera::default();
     tera.add_raw_template("template", &template)
         .expect("Error loading template in engine");
@@ -219,7 +335,18 @@ pub fn main() -> std::result::Result<(), String> {
     tera.register_tester("file", testers::is_file);
     tera.register_tester("directory", testers::is_directory);
 
-    let rendered = tera.render("template", &context).expect("Error rendering template");
+    tera.render("template", &context).expect("Error rendering template")
+}
+
+pub fn main() -> std::result::Result<(), String> {
+    let Config{template, context, out_file } = parse_args();
+
+    let rendered = if let Some(template) = template {
+        tera_render(template, context)
+    }else {
+        serde_yaml::to_string(&context);
+        context.as_json().expect("Error encoding ctx as json").to_string()
+    };
 
     if let Some(filepath) = out_file {
         let mut file = fs::File::create(&filepath).expect("Error creating output file");

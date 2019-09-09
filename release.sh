@@ -17,3 +17,6 @@ cargo build --release --target x86_64-apple-darwin
 
 echo "Building target for platform x86_64-unknown-linux-musl"
 cargo build --target x86_64-unknown-linux-musl --release
+
+echo "Building target for platform x86_64-pc-windows-msvc"
+cargo build --target x86_64-pc-windows-msvc --release

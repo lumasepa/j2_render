@@ -1,3 +1,9 @@
 [target.x86_64-apple-darwin]
 linker = "x86_64-apple-darwin17-clang"
 ar = "x86_64-apple-darwin17 -ar"
+
+[target.x86_64-pc-windows-msvc]
+rustflags = ["-Ctarget-feature=+crt-static"]
+
+[target.i686-pc-windows-msvc]
+rustflags = ["-Ctarget-feature=+crt-static"]
