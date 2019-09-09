@@ -1,10 +1,10 @@
 #![feature(or_patterns)]
 
 use molysite::hcl::parse_hcl;
+use regex::Regex;
 use serde_json;
 use serde_yaml;
 use tera::{Context, Tera};
-use regex::Regex;
 
 use std::ffi::OsStr;
 use std::io::Write;
@@ -16,11 +16,11 @@ use std::{
     path::Path,
 };
 
+mod error;
 mod filters;
 mod functions;
 mod inners;
 mod testers;
-mod error;
 
 use crate::error::{ToWrapErrorResult, WrapError};
 
@@ -29,23 +29,49 @@ pub struct Config {
     pub context: Context,
     pub output: Option<Output>,
 }
+/*
+ * file=file_path
+ * stdin
+ * env
+ * value=value,
+ * http=url <- auth?
+*/
+
+pub enum Source {
+    File { path: String },
+    StdIn,
+    Env,
+    Value { value: String },
+    Http { url: String },
+}
+
+/*
+* file=file_path
+* stdout
+* http=url
+*/
+pub enum Destination {
+    File { path: String },
+    StdOut,
+    Http { url: String },
+}
 
 struct Pick {
     name: Option<String>,
     path: String,
-    namespace: Option<String>
+    namespace: Option<String>,
 }
 
 struct Output {
     format: Option<String>,
-    filepath: Option<String>
+    destination: Option<Destination>,
 }
 
 struct Input {
     format: String,
     picks: Option<Vec<Pick>>,
     namespace: Option<String>,
-    content: String,
+    source: Source,
 }
 
 pub fn parse_input_manipulation(mut args: &mut Vec<String>) -> Input {
@@ -53,7 +79,6 @@ pub fn parse_input_manipulation(mut args: &mut Vec<String>) -> Input {
         if arg.starts_with("-") {
             args.push(arg);
         } else {
-
         }
     }
     panic!()
@@ -63,18 +88,17 @@ pub fn parse_output_manipulation(&mut args: &mut Vec<String>) -> Option<Output> 
     panic!()
 }
 
-
 pub fn parse_args_2() -> Result<Config, WrapError> {
     let mut args = env::args().collect::<Vec<String>>();
     args.reverse();
 
-    let mut config = Config{
+    let mut config = Config {
         template: None,
         context: Context::new(),
         output: None,
     };
 
-    let mut inputs : Vec<Input> = vec![];
+    let mut inputs: Vec<Input> = vec![];
 
     args.pop(); // binary name
 
@@ -84,7 +108,7 @@ pub fn parse_args_2() -> Result<Config, WrapError> {
                 let variable = args
                     .pop()
                     .wrap("error specified --var/-v flag but not value provided")?;
-                let mut parts : Vec<&str> = variable.splitn(2, '=').collect();
+                let mut parts: Vec<&str> = variable.splitn(2, '=').collect();
                 let key = parts.pop().expect("Error no key=value found");
                 let value = parts.pop().expect("Error no key=value found");
                 args.push(format!("value={}", value));
@@ -97,7 +121,9 @@ pub fn parse_args_2() -> Result<Config, WrapError> {
             }
             "--stdin" | "-i" => {
                 let mut value = String::new();
-                io::stdin().read_to_string(&mut value).expect("Error readinf from stdin");
+                io::stdin()
+                    .read_to_string(&mut value)
+                    .expect("Error readinf from stdin");
                 args.push(format!("value={}", value));
                 let input = parse_input_manipulation(&mut args);
                 inputs.push(input);
@@ -120,10 +146,11 @@ pub fn parse_args_2() -> Result<Config, WrapError> {
                 inputs.push(input);
             }
             "--env" | "-e" => {
-                if let Some(variable_name) =  args.pop(){
+                if let Some(variable_name) = args.pop() {
                     let value = env::vars()
                         .collect::<HashMap<String, String>>()
-                        .get(&variable_name).wrap("Env var expected not found")?;
+                        .get(&variable_name)
+                        .wrap("Env var expected not found")?;
                     args.push(format!("value={}", value));
                 } else {
                     args.push("value=__env__".to_string());
@@ -144,19 +171,9 @@ pub fn parse_args_2() -> Result<Config, WrapError> {
 }
 
 pub fn help() {
-   println!(
+    println!(
         "
 j2_render [FLAGS]
-
-    OPTIONS:
-        SOURCES = file=file_path,stdin,env,value=value,http=url <- auth?
-        DESTINATIONS = http=url,file=file_path,stdout,env
-        FORMATS = json5,json,yaml,hcl,tfvars,tf,template,j2,tpl
-        JMES_PATH = jmespath expression -- http://jmespath.org/tutorial.html
-
-        INPUT_MANIPULATION = source=SOURCE format|f=FORMATS namespace|n=key.key.key path|p=JMES_PATH as=key
-        OUTPUT_MANIPULATION = format|f=FORMATS file=filepath
-
     FLAGS:
 
     Inputs :
@@ -171,25 +188,58 @@ j2_render [FLAGS]
     --out/-o OUTPUT_MANIPULATION
 
     --help/-h   -- shows this help
+
+    Options:
+        INPUT_MANIPULATION = 
+            source|s=SOURCE
+            format|f=INPUT_FORMATS
+            namespace|n=key.key.key
+            path|p=JMES_PATH 
+            as=key
+
+        OUTPUT_MANIPULATION = 
+            destination|d=DESTINATION
+            format|f=OUTPUT_DATA_FORMATS
+
+        SOURCES: 
+            * file=file_path
+            * stdin
+            * env
+            * value=value,
+            * http=url <- auth?
+
+        DESTINATIONS: 
+            * file=file_path
+            * stdout
+            * http=url
+
+        Formats:
+            INPUT_DATA_FORMATS: json5,json,yaml,hcl,tfvars,tf
+            OUTPUT_DATA_FORMATS: json,yaml
+            TEMPLATE_FORMATS : template,j2,tpl
+            INPUT_FORMATS : INPUT_DATA_FORMATS + TEMPLATE_FORMATS
+
+        JMES_PATH = jmespath expression -- http://jmespath.org/tutorial.html
+
     "
     )
 }
 
-fn extract_format(string: &str) -> Option<(String,String)> {
-    let mut parts : Vec<&str>= string.splitn(2, '+').collect();
+fn extract_format(string: &str) -> Option<(String, String)> {
+    let mut parts: Vec<&str> = string.splitn(2, '+').collect();
     let format = parts.pop().expect("");
-    if parts.len() == 0  {
-        return None
+    if parts.len() == 0 {
+        return None;
     }
     let other = parts.pop().expect("");
-    return Some((format.to_string(), other.to_string()))
+    return Some((format.to_string(), other.to_string()));
 }
 
 pub fn parse_args() -> Config {
     let mut args = env::args().collect::<Vec<String>>();
     args.reverse();
 
-    let mut config = Config{
+    let mut config = Config {
         template: None,
         context: Context::new(),
         output: None,
@@ -203,7 +253,7 @@ pub fn parse_args() -> Config {
                 let variable = args
                     .pop()
                     .expect("error specified --var/-v flag but not value provided");
-                let mut parts : Vec<&str> = variable.splitn(2, '=').collect();
+                let mut parts: Vec<&str> = variable.splitn(2, '=').collect();
                 let key = parts.pop().expect("Error no key=value found");
                 let value = parts.pop().expect("Error no key=value found");
 
@@ -294,7 +344,10 @@ pub fn populate_ctx(context: &mut Context, format: String, data: String) {
         }
         "hcl" | "tfvars" | "tf" => {
             let value = parse_hcl(&data).expect("Error parsing hcl/tf/tfvars");
-            let value = value.to_string().parse::<serde_json::Value>().expect("Error parsing json of hcl/tf/tfvars");
+            let value = value
+                .to_string()
+                .parse::<serde_json::Value>()
+                .expect("Error parsing json of hcl/tf/tfvars");
 
             let object = value
                 .as_object()
@@ -339,11 +392,15 @@ pub fn tera_render(template: String, context: Context) -> String {
 }
 
 pub fn main() -> std::result::Result<(), String> {
-    let Config{template, context, out_file } = parse_args();
+    let Config {
+        template,
+        context,
+        out_file,
+    } = parse_args();
 
     let rendered = if let Some(template) = template {
         tera_render(template, context)
-    }else {
+    } else {
         serde_yaml::to_string(&context);
         context.as_json().expect("Error encoding ctx as json").to_string()
     };
