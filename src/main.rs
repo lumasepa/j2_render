@@ -21,145 +21,19 @@ mod error;
 mod j2;
 mod pairs;
 mod source;
+mod parse;
 
 use crate::destination::Destination;
 use crate::error::{ToWrapErrorResult, WrapError};
 use crate::j2::tera::tera_render;
 use crate::pairs::Pairs;
 use crate::source::Source;
+use crate::parse::{Output, parse_args, parse_pairs};
 
 pub struct Config {
     pub template: Option<String>,
     pub context: Context,
     pub output: Option<Output>,
-}
-
-pub struct Pick {
-    name: Option<String>,
-    path: String,
-    namespace: Option<String>,
-}
-
-pub struct Output {
-    destination: Destination,
-    format: Option<String>,
-}
-
-pub struct Input {
-    source: Source,
-    format: String,
-    picks: Option<Vec<Pick>>,
-    namespace: Option<String>,
-}
-
-pub fn get_source_content(source: Source) -> Result<String, WrapError> {
-    panic!()
-}
-
-pub fn parse_input_pairs(pairs: Pairs) -> Result<Input, WrapError> {
-    let source = Source::try_from_pairs(&pairs).wrap("Error parsing source from pairs")?;
-    let format = pairs.get("format").wrap("Expected format=")?;
-    let path = pairs.get("path");
-    let namespace = pairs.get("namespace");
-    let name = pairs.get("as");
-    let picks = path.map(|path| {
-        let mut picks = vec![];
-        let pick = Pick {
-            name,
-            path,
-            namespace: namespace.clone(),
-        };
-        picks.push(pick);
-        picks
-    });
-    return Ok(Input {
-        source,
-        picks,
-        namespace,
-        format,
-    });
-}
-
-pub fn parse_output_pairs(pairs: Pairs) -> Result<Output, WrapError> {
-    let destination = Destination::try_from_pairs(&pairs).wrap("Error parsing source from pairs")?;
-    let format = pairs.get("format");
-    return Ok(Output { destination, format });
-}
-
-pub fn parse_args() -> Result<Config, WrapError> {
-    let mut args = env::args().collect::<Vec<String>>();
-    args.reverse();
-
-    let mut config = Config {
-        template: None,
-        context: Context::new(),
-        output: None,
-    };
-
-    let mut inputs: Vec<Input> = vec![];
-
-    args.pop(); // binary name
-
-    while let Some(arg) = args.pop() {
-        let pairs = match arg.as_str() {
-            "--var" | "-v" => {
-                let variable = args
-                    .pop()
-                    .wrap("error specified --var/-v flag but not value provided")?;
-                let mut parts: Vec<&str> = variable.splitn(2, '=').collect();
-                let key = parts.pop().expect("Error no key=value found");
-                let value = parts.pop().expect("Error no key=value found");
-                args.push("source=var".to_string());
-                args.push(format!("value={}", value));
-                args.push(format!("namespace={}", key));
-                Pairs::try_from_args(&mut args)?
-            }
-            "--out" | "-o" => Pairs::try_from_args(&mut args)?,
-            "--stdin" | "-i" => {
-                let mut value = String::new();
-                io::stdin()
-                    .read_to_string(&mut value)
-                    .expect("Error readinf from stdin");
-                args.push(format!("source=stdin"));
-                Pairs::try_from_args(&mut args)?
-            }
-            "--file" | "-f" => {
-                let path = args
-                    .pop()
-                    .expect("error specified --file/-f flag but not context file path provided");
-
-                let extension = Path::new(&path)
-                    .extension()
-                    .and_then(OsStr::to_str)
-                    .expect("Error no extension found in ctx file");
-
-                let value = fs::read_to_string(&path).expect(&format!("Error reading context file {}", path));
-
-                args.push(format!("source=file"));
-                args.push(format!("file={}", path));
-                args.push(format!("format={}", extension));
-                Pairs::try_from_args(&mut args)?
-            }
-            "--env" | "-e" => {
-                if let Some(variable_name) = args.pop() {
-                    if !variable_name.starts_with("-") {
-                        args.push(arg);
-                    } else {
-                        args.push(format!("key={}", variable_name));
-                    }
-                }
-                args.push("source=env".to_string());
-                Pairs::try_from_args(&mut args)?
-            }
-            "--help" | "help" | "-h" => {
-                help();
-                exit(0);
-            }
-            _ => panic!("Error argument {} not recognized", arg),
-        };
-    }
-
-    return Ok(config);
 }
 
 pub fn help() {
@@ -169,10 +43,10 @@ render [FLAGS]
     render is a tool to work with configurations and data in general.
 
     It can load data from different inputs and in different formats,
-    all data is transformed to json and loaded in the \"context\"
-    you can arranged it as you want in the \"context\". Then the
-    \"context\" is used to render the template then the template is
-    sent to the outputs or in case of no template provided the \"context\"
+    all data is transformed to json and loaded in the Context
+    you can arranged it as you want in the Context. Then the
+    Context is used to render the template then the template is
+    sent to the outputs or in case of no template provided the Context
     is sent to the outputs.
 
     To declare an input or output use a flag --flag and then write the pairs
@@ -182,12 +56,12 @@ render [FLAGS]
     automatically some pairs, behind each FLAG you will find which pairs
     it sets.
 
-    To modify an input before adding it to the context the path= pair
+    To modify an input before adding it to the Context the path= pair
     is used, path= accepts a JMES_PATH expresion to modify the input.
 
-    To arrange the input in the context the namespace= and as= pairs
+    To arrange the input in the Context the namespace= and as= pairs
     are used. The namespace= indicates the KEY_PATH where the input
-    is going to be placed in the context. The as= indicates the key
+    is going to be placed in the Context. The as= indicates the key
     or index where the input is going to be placed.
 
     The template engine of render is tera https://tera.netlify.com/ an
@@ -200,7 +74,7 @@ render [FLAGS]
 
     Workflow:
 
-    inputs.iter |> read input |> parse input to json |> jmespath |> context
+    inputs.iter |> read input |> parse input |> transform to json |> jmespath |> context
 
     context |> template ? render template : context |> outputs
 
@@ -271,7 +145,7 @@ render [FLAGS]
 
         DESTINATIONS:
         destination|d=
-            file file|f=file_path|template
+            file file=file_path|template
             stdout
             http url=url|template
                 [method=[GET,POST,PUT,template]]  -- default POST
@@ -435,7 +309,45 @@ render [FLAGS]
 //    }
 //}
 
-pub fn main() -> std::result::Result<(), String> {
+pub fn main() {
+    if let Err(e) = cli_main() {
+        println!("{}", e);
+        exit(1)
+    }
+}
+
+pub fn print_pairs(pairs: &Pairs) {
+    println!("{}",'{');
+    for (k, v) in pairs.iter() {
+        println!("  {}={}", k, v)
+    }
+    println!("{}",'}');
+}
+
+pub fn cli_main() -> std::result::Result<(), WrapError> {
+    let mut args = env::args().collect::<Vec<String>>();
+
+    let pairs_objects = parse_args(&mut args).wrap("Error parsing args")?;
+
+    println!("pairs:");
+    for pairs in pairs_objects.iter() {
+        print_pairs(&pairs);
+    }
+
+    let (inputs, outputs) = parse_pairs(pairs_objects).wrap("Error parsing pairs")?;
+
+    println!("Inputs:");
+    for input in inputs{
+        println!("{:?}", input);
+    }
+
+    println!("Outputs:");
+    for output in outputs{
+        println!("{:?}", output);
+    }
+
+
+
     panic!()
     //    let Config {
     //        template,

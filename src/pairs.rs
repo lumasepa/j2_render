@@ -1,6 +1,7 @@
 use crate::error::{WrapError, ToWrapErrorResult};
 use std::slice::Iter;
 
+#[derive(Debug)]
 pub struct Pairs {
     inner: Vec<(String, String)>
 }
@@ -61,15 +62,16 @@ impl Pairs {
 
     fn parse_pair(pair: &str) -> Result<(String, String), WrapError> {
         let mut pair : Vec<&str> = pair.splitn(2,'=').collect();
-        let key = pair.pop().wrap("Expected key=value pattern, key not found")?;
-        let value = pair.pop().wrap("Expected key=value pattern, value not found")?;
+        let value = pair.pop().wrap("Expected key=value pattern, key not found")?;
+        let key = pair.pop().wrap("Expected key=value pattern, value not found")?;
         Ok((key.to_string(), value.to_string()))
     }
 
     pub fn is_input(&self) -> bool {
-        self.get("source").is_some()
+        self.get("source").or(self.get("s")).is_some()
     }
+
     pub fn is_output(&self) -> bool {
-        self.get("destination").is_some()
+        self.get("destination").or(self.get("d")).is_some()
     }
 }

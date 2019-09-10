@@ -1,6 +1,7 @@
 use crate::pairs::Pairs;
 use crate::error::{WrapError, ToWrapErrorResult};
 
+#[derive(Debug)]
 pub enum Source {
     File { path: String },
     StdIn,
@@ -12,7 +13,7 @@ pub enum Source {
 
 impl Source {
     pub fn try_from_pairs(pairs: &Pairs) -> Result<Self, WrapError> {
-        let source = pairs.get("source").wrap("Expected source in input")?;
+        let source = pairs.get("source").or(pairs.get("s")).wrap("Expected source in input")?;
         let source = match source.as_ref() {
             "file" => Source::File{
                 path: pairs.get("file").wrap("Expected file path in source file")?.to_owned()

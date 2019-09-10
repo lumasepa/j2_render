@@ -21,7 +21,7 @@ impl WrapError {
         WrapError {description: description}
     }
     pub fn new_first(description: &str)  -> Self {
-        WrapError {description: description.to_string()}
+        WrapError {description: format!("-> Caused By : {}", description)}
     }
 }
 
