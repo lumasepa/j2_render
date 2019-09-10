@@ -16,17 +16,17 @@ use std::{
     path::Path,
 };
 
+mod destination;
 mod error;
 mod j2;
 mod pairs;
 mod source;
-mod destination;
 
+use crate::destination::Destination;
 use crate::error::{ToWrapErrorResult, WrapError};
 use crate::j2::tera::tera_render;
 use crate::pairs::Pairs;
 use crate::source::Source;
-use crate::destination::Destination;
 
 pub struct Config {
     pub template: Option<String>,
@@ -62,21 +62,29 @@ pub fn parse_input_pairs(pairs: Pairs) -> Result<Input, WrapError> {
     let path = pairs.get("path");
     let namespace = pairs.get("namespace");
     let name = pairs.get("as");
-    let picks = path.map(|path|{
+    let picks = path.map(|path| {
         let mut picks = vec![];
-        let pick = Pick{name,path,namespace: namespace.clone()};
+        let pick = Pick {
+            name,
+            path,
+            namespace: namespace.clone(),
+        };
         picks.push(pick);
         picks
     });
-    return Ok(Input{source,picks,namespace,format});
+    return Ok(Input {
+        source,
+        picks,
+        namespace,
+        format,
+    });
 }
 
 pub fn parse_output_pairs(pairs: Pairs) -> Result<Output, WrapError> {
     let destination = Destination::try_from_pairs(&pairs).wrap("Error parsing source from pairs")?;
     let format = pairs.get("format");
-    return Ok(Output{destination, format})
+    return Ok(Output { destination, format });
 }
-
 
 pub fn parse_args() -> Result<Config, WrapError> {
     let mut args = env::args().collect::<Vec<String>>();
@@ -106,9 +114,7 @@ pub fn parse_args() -> Result<Config, WrapError> {
                 args.push(format!("namespace={}", key));
                 Pairs::try_from_args(&mut args)?
             }
-            "--out" | "-o" => {
-                Pairs::try_from_args(&mut args)?
-            }
+            "--out" | "-o" => Pairs::try_from_args(&mut args)?,
             "--stdin" | "-i" => {
                 let mut value = String::new();
                 io::stdin()
@@ -136,7 +142,7 @@ pub fn parse_args() -> Result<Config, WrapError> {
             }
             "--env" | "-e" => {
                 if let Some(variable_name) = args.pop() {
-                    if ! variable_name.starts_with("-") {
+                    if !variable_name.starts_with("-") {
                         args.push(arg);
                     } else {
                         args.push(format!("key={}", variable_name));
@@ -225,6 +231,9 @@ render [FLAGS]
     --k8s namespace::[secret,configmap]::uri [INPUT_MANIPULATION]
         source=k8s k8s_namespace=namespace resource=[secret,configmap] uri=uri format=yaml
 
+    --s3 s3://bucket/path [INPUT_MANIPULATION]
+        source=s3 bucket=bucket path=path format=s3_url_extension
+
     Output:
     --out/-o DESTINATION [OUTPUT_MANIPULATION]
 
@@ -253,8 +262,12 @@ render [FLAGS]
                 [basic=user:pass|template]
                 [token=value|template]
                 [digest=user:pass|template]
-            k8s source=k8s k8s_namespace=namespace|template resource=[secret,configmap,template] uri=uri|template
+            k8s k8s_namespace=namespace|template resource=[secret,configmap,template] uri=uri|template
                 [kubectlconfig=path]  -- default env.KUBECTLCONFIG
+            s3 bucket=bucket_name path=path
+                [api_key=api_key]  -- default env.AWS_ACCESS_KEY_ID
+                [api_secret=api_secret]   -- default env.AWS_SECRET_ACCESS_KEY
+                [region=region]   -- default env.AWS_DEFAULT_REGION
 
         DESTINATIONS:
         destination|d=
@@ -266,9 +279,12 @@ render [FLAGS]
                 [basic=user:pass|template]
                 [token=value|template]
                 [digest=user:pass|template]
-            k8s source=k8s k8s_namespace=namespace|template resource=[secret,configmap,template] uri=uri|template
+            k8s k8s_namespace=namespace|template resource=[secret,configmap,template] uri=uri|template
                 [kubectlconfig=path]  -- default env.KUBECTLCONFIG
-
+            s3 bucket=bucket_name path=path
+                [api_key=api_key]  -- default env.AWS_ACCESS_KEY_ID
+                [api_secret=api_secret]   -- default env.AWS_SECRET_ACCESS_KEY
+                [region=region]   -- default env.AWS_DEFAULT_REGION
 
         KEY_PATH = absolute JMES_PATH to a key like root.first[5].third
 
@@ -421,27 +437,27 @@ render [FLAGS]
 
 pub fn main() -> std::result::Result<(), String> {
     panic!()
-//    let Config {
-//        template,
-//        context,
-//        out_file,
-//    } = parse_args();
-//
-//    let rendered = if let Some(template) = template {
-//        tera_render(template, context)
-//    } else {
-//        serde_yaml::to_string(&context);
-//        context.as_json().expect("Error encoding ctx as json").to_string()
-//    };
-//
-//    if let Some(filepath) = out_file {
-//        let mut file = fs::File::create(&filepath).expect("Error creating output file");
-//        file.write_all(rendered.as_ref()).expect("Error writing to output file");
-//    } else {
-//        io::stdout()
-//            .write_all(rendered.as_ref())
-//            .expect("Error writing to stdout");
-//    }
-//
-//    Ok(())
+    //    let Config {
+    //        template,
+    //        context,
+    //        out_file,
+    //    } = parse_args();
+    //
+    //    let rendered = if let Some(template) = template {
+    //        tera_render(template, context)
+    //    } else {
+    //        serde_yaml::to_string(&context);
+    //        context.as_json().expect("Error encoding ctx as json").to_string()
+    //    };
+    //
+    //    if let Some(filepath) = out_file {
+    //        let mut file = fs::File::create(&filepath).expect("Error creating output file");
+    //        file.write_all(rendered.as_ref()).expect("Error writing to output file");
+    //    } else {
+    //        io::stdout()
+    //            .write_all(rendered.as_ref())
+    //            .expect("Error writing to stdout");
+    //    }
+    //
+    //    Ok(())
 }
