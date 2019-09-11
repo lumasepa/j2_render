@@ -6,11 +6,8 @@ use serde_json;
 use serde_yaml;
 use tera::{Context, Tera};
 
-use std::ffi::OsStr;
-use std::io::Write;
 use std::process::exit;
 use std::{
-    collections::HashMap,
     env, fs,
     io::{self, Read},
     path::Path,
@@ -20,15 +17,15 @@ mod destination;
 mod error;
 mod j2;
 mod pairs;
-mod source;
 mod parse;
+mod source;
 
 use crate::destination::Destination;
 use crate::error::{ToWrapErrorResult, WrapError};
 use crate::j2::tera::tera_render;
 use crate::pairs::Pairs;
+use crate::parse::{parse_args, parse_pairs, Input, Output};
 use crate::source::Source;
-use crate::parse::{Output, parse_args, parse_pairs};
 
 pub struct Config {
     pub template: Option<String>,
@@ -317,17 +314,24 @@ pub fn main() {
 }
 
 pub fn print_pairs(pairs: &Pairs) {
-    println!("{}",'{');
+    println!("{}", '{');
     for (k, v) in pairs.iter() {
         println!("  {}={}", k, v)
     }
-    println!("{}",'}');
+    println!("{}", '}');
+}
+
+pub fn load_input(input: Input, ctx: &mut Context) -> Option<String> {
+    panic!()
 }
 
 pub fn cli_main() -> std::result::Result<(), WrapError> {
     let mut args = env::args().collect::<Vec<String>>();
 
     let pairs_objects = parse_args(&mut args).wrap("Error parsing args")?;
+
+    let mut context = Context::new();
+    let mut template: Option<String> = None;
 
     println!("pairs:");
     for pairs in pairs_objects.iter() {
@@ -337,16 +341,16 @@ pub fn cli_main() -> std::result::Result<(), WrapError> {
     let (inputs, outputs) = parse_pairs(pairs_objects).wrap("Error parsing pairs")?;
 
     println!("Inputs:");
-    for input in inputs{
+    for input in inputs {
         println!("{:?}", input);
+        let maybe_template = load_input(input, &mut context);
+        maybe_template.map(|tpl| template = Some(tpl));
     }
 
     println!("Outputs:");
-    for output in outputs{
+    for output in outputs {
         println!("{:?}", output);
     }
-
-
 
     panic!()
     //    let Config {
