@@ -1,7 +1,6 @@
 #![feature(or_patterns)]
 
 use molysite::hcl::parse_hcl;
-use regex::Regex;
 use serde_json;
 use serde_yaml;
 use tera::{Context, Tera};
@@ -159,11 +158,11 @@ render [FLAGS]
         JMES_PATH = jmespath expression -- http://jmespath.org/tutorial.html
 
         Formats:
-            INPUT_DATA_FORMATS: json5,json,yaml,hcl,tfvars,tf,csv,string
+            ENCODINGS: base64
+            INPUT_DATA_FORMATS: ENCODING?+json5,json,yaml,hcl,tfvars,tf,csv
             OUTPUT_DATA_FORMATS: json,yaml,csv
             TEMPLATE_FORMATS : template,j2,tpl
             INPUT_FORMATS : INPUT_DATA_FORMATS + TEMPLATE_FORMATS
-
     "
     )
 }
@@ -335,6 +334,7 @@ pub fn cli_main() -> std::result::Result<(), WrapError> {
     for input in inputs {
         let content = input.get_content().wrap("Error getting content of input")?;
         let ctx = input.deserialize(content).wrap("Error deserializing input")?;
+        let ctx = input.filter_by_jmespath(ctx).wrap("Error applying jmespath")?;
         // path jamespath
     }
 

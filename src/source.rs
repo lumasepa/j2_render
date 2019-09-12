@@ -3,6 +3,7 @@ use crate::pairs::Pairs;
 use std::collections::HashMap;
 use std::io::Read;
 use std::{env, fs, io};
+use tera::Context;
 
 #[derive(Debug)]
 pub enum Source {
@@ -54,21 +55,23 @@ impl Source {
             }
             Source::Env { key } => {
                 let env_vars = env::vars().collect::<HashMap<String, String>>();
-
-                let value: String = if let Some(key) = key {
-                    let value = env_vars.get(key).map(|key| key.to_owned()).unwrap_or_else(|| {
-                        eprintln!("Env var {} not found", key);
-                        String::new()
-                    });
-                    value.to_owned()
+                let mut ctx = Context::new();
+                if let Some(key) = key {
+                    let value = env_vars.get(key)
+                        .map(|key| key.to_owned())
+                        .unwrap_or_else(|| {
+                            eprintln!("Env var {} not found", key);
+                            String::new()
+                        });
+                    ctx.insert(key, &value);
                 } else {
-                    let mut env_vars_content = String::new();
                     for (k, v) in env_vars {
-                        env_vars_content += &format!("{}={}\n", k, v)
+                        ctx.insert(&k, &v);
                     }
-                    env_vars_content.to_owned()
                 };
-                value
+                ctx.as_json()
+                    .wrap("Error transforming env to json")?
+                    .to_string()
             }
             Source::Var { value } => value.to_owned(),
             Source::Http { .. } => panic!(""),

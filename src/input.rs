@@ -3,6 +3,15 @@ use crate::error::{WrapError, ToWrapErrorResult};
 use tera::Context;
 use crate::source::Source;
 use crate::pairs::Pairs;
+use molysite::types::JsonValue;
+use serde_json::Value;
+use json5;
+
+
+
+
+
+
 
 #[derive(Debug)]
 pub struct Pick {
@@ -15,7 +24,7 @@ pub struct Pick {
 pub struct Input {
     source: Source,
     format: String,
-    picks: Option<Vec<Pick>>,
+    picks: Vec<Pick>,
     namespace: Option<String>,
 }
 
@@ -35,7 +44,7 @@ impl Input {
             };
             picks.push(pick);
             picks
-        });
+        }).or_else(|| Some(vec![])).unwrap();
         return Ok(Input {
             source,
             picks,
@@ -52,9 +61,6 @@ impl Input {
         let mut context = Context::new();
 
         match self.format.as_ref() {
-            "string" => {
-
-            }
             "yaml" | "yml" => {
                 let value: serde_yaml::Value = serde_yaml::from_str(&data).wrap("Error parsing yaml")?;
                 let object = value.as_mapping().wrap("Error expected object in root of yaml file")?;
@@ -66,6 +72,13 @@ impl Input {
             "json" => {
                 let value = data.parse::<serde_json::Value>().wrap("Error parsing json")?;
                 let object = value.as_object().wrap("Error expected object in root of json file")?;
+                for (k, v) in object.iter() {
+                    context.insert(k, v);
+                }
+            }
+            "json5" => {
+                let value = json5::from_str::<serde_json::Value>(&data).wrap("Error parsing json5")?;
+                let object = value.as_object().wrap("Error expected object in root of json5 file")?;
                 for (k, v) in object.iter() {
                     context.insert(k, v);
                 }
@@ -94,5 +107,16 @@ impl Input {
             _ => return Err(WrapError::new_first(&format!("Format {} not recognized", self.format))),
         }
         Ok(context)
+    }
+
+    pub fn filter_by_jmespath(&self, ctx: Context) -> Result<Context, WrapError> {
+        let json_obj = ctx.as_json().wrap("Error converting ctx to json")?;
+
+        for pick in self.picks.iter() {
+            let expr = jmespath::compile(&pick.path).wrap(&format!("Error parsing jmespath : {}", pick.path))?;
+            let result = expr.search(&json_obj).wrap(&format!("Error evaluating jmespath : {}", pick.path))?;
+
+        }
+        panic!()
     }
 }

@@ -11,14 +11,26 @@ license = "MIT"
 tera = "0.11.20"
 serde = "1.0.99"
 toml = "0.5.3"
+json5 = "0.2.5"
 serde_json = "1.0.40"
 serde_yaml = "0.8.9"
 glob = "0.3.0"
 base64 = "0.10.1"
-regex = "1"
 molysite = { git = "https://github.com/evq/molysite" }
 jmespath = "0.2.0"
+
+[dependencies.reqwest]
+version = "0.9.20"
+features = ["default-tls-vendored"]
 
 [[bin]]
 name = "j2_render"
 path = "src/main.rs"
+
+[[bin]]
+name = "hcl2json"
+path = "src/hcl2json.rs"
+
+[profile.release]
+lto = true
+codegen-units = 1

@@ -76,7 +76,7 @@ pub fn parse_args(mut args: &mut Vec<String>) -> Result<Vec<Pairs>, WrapError> {
                     }
                 }
                 args.push("source=env".to_string());
-                args.push("format=string".to_string());
+                args.push("format=json".to_string());
                 Pairs::try_from_args(&mut args)?
             }
             "--help" | "help" | "-h" => {
