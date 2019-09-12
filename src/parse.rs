@@ -6,71 +6,22 @@ use std::process::exit;
 use crate::help;
 use std::path::Path;
 use std::ffi::OsStr;
+use serde_json::Value;
+use molysite::hcl::parse_hcl;
+use tera::Context;
+use crate::input::Input;
+use crate::output::Output;
 
-#[derive(Debug)]
-pub struct Pick {
-    name: Option<String>,
-    path: String,
-    namespace: Option<String>,
-}
-
-#[derive(Debug)]
-pub struct Output {
-    destination: Destination,
-    format: Option<String>,
-}
-
-#[derive(Debug)]
-pub struct Input {
-    source: Source,
-    format: String,
-    picks: Option<Vec<Pick>>,
-    namespace: Option<String>,
-}
-
-pub fn get_source_content(source: Source) -> Result<String, WrapError> {
-    panic!()
-}
-
-pub fn parse_input(pairs: Pairs) -> Result<Input, WrapError> {
-    let source = Source::try_from_pairs(&pairs).wrap("Error parsing source from pairs")?;
-    let format = pairs.get("format").or(pairs.get("f")).wrap("Expected format=")?;
-    let path = pairs.get("path").or(pairs.get("p"));
-    let namespace = pairs.get("namespace").or(pairs.get("n"));
-    let name = pairs.get("as");
-    let picks = path.map(|path| {
-        let mut picks = vec![];
-        let pick = Pick {
-            name,
-            path,
-            namespace: namespace.clone(),
-        };
-        picks.push(pick);
-        picks
-    });
-    return Ok(Input {
-        source,
-        picks,
-        namespace,
-        format,
-    });
-}
-
-pub fn parse_output(pairs: Pairs) -> Result<Output, WrapError> {
-    let destination = Destination::try_from_pairs(&pairs).wrap("Error parsing source from pairs")?;
-    let format = pairs.get("format").or(pairs.get("f"));
-    return Ok(Output { destination, format });
-}
 
 pub fn parse_pairs(pairs_objects: Vec<Pairs>) -> Result<(Vec<Input>, Vec<Output>), WrapError> {
     let mut inputs = vec![];
     let mut outputs = vec![];
     for pairs in pairs_objects {
         if pairs.is_input() {
-            let input = parse_input(pairs).wrap("Error parsing input pairs")?;
+            let input = Input::try_from_pairs(pairs).wrap("Error parsing input pairs")?;
             inputs.push(input);
         } else if pairs.is_output() {
-            let output = parse_output(pairs).wrap("Error parsing output pairs")?;
+            let output = Output::try_from_pairs(pairs).wrap("Error parsing output pairs")?;
             outputs.push(output);
         } else {
             return Err(WrapError::new_first("Error: pairs object without source or destination"))

@@ -19,19 +19,16 @@ mod j2;
 mod pairs;
 mod parse;
 mod source;
+mod input;
+mod output;
 
 use crate::destination::Destination;
 use crate::error::{ToWrapErrorResult, WrapError};
 use crate::j2::tera::tera_render;
 use crate::pairs::Pairs;
-use crate::parse::{parse_args, parse_pairs, Input, Output};
+use crate::parse::{parse_args, parse_pairs};
 use crate::source::Source;
-
-pub struct Config {
-    pub template: Option<String>,
-    pub context: Context,
-    pub output: Option<Output>,
-}
+use serde_json::Value;
 
 pub fn help() {
     println!(
@@ -162,7 +159,7 @@ render [FLAGS]
         JMES_PATH = jmespath expression -- http://jmespath.org/tutorial.html
 
         Formats:
-            INPUT_DATA_FORMATS: json5,json,yaml,hcl,tfvars,tf,csv
+            INPUT_DATA_FORMATS: json5,json,yaml,hcl,tfvars,tf,csv,string
             OUTPUT_DATA_FORMATS: json,yaml,csv
             TEMPLATE_FORMATS : template,j2,tpl
             INPUT_FORMATS : INPUT_DATA_FORMATS + TEMPLATE_FORMATS
@@ -314,15 +311,11 @@ pub fn main() {
 }
 
 pub fn print_pairs(pairs: &Pairs) {
-    println!("{}", '{');
+    print!("{} ", '{');
     for (k, v) in pairs.iter() {
-        println!("  {}={}", k, v)
+        print!("{}={} ", k, v)
     }
     println!("{}", '}');
-}
-
-pub fn load_input(input: Input, ctx: &mut Context) -> Option<String> {
-    panic!()
 }
 
 pub fn cli_main() -> std::result::Result<(), WrapError> {
@@ -333,26 +326,24 @@ pub fn cli_main() -> std::result::Result<(), WrapError> {
     let mut context = Context::new();
     let mut template: Option<String> = None;
 
-    println!("pairs:");
     for pairs in pairs_objects.iter() {
         print_pairs(&pairs);
     }
 
     let (inputs, outputs) = parse_pairs(pairs_objects).wrap("Error parsing pairs")?;
 
-    println!("Inputs:");
     for input in inputs {
-        println!("{:?}", input);
-        let maybe_template = load_input(input, &mut context);
-        maybe_template.map(|tpl| template = Some(tpl));
+        let content = input.get_content().wrap("Error getting content of input")?;
+        let ctx = input.deserialize(content).wrap("Error deserializing input")?;
+        // path jamespath
+
     }
 
-    println!("Outputs:");
     for output in outputs {
-        println!("{:?}", output);
+
     }
 
-    panic!()
+    Ok(())
     //    let Config {
     //        template,
     //        context,

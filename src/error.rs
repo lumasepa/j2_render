@@ -33,16 +33,6 @@ impl Display for WrapError {
 
 impl Error for WrapError {}
 
-pub trait ToWrapError {
-    fn to_wrap_error(&self, description: &str) -> WrapError;
-}
-
-impl ToWrapError for dyn Display {
-    fn to_wrap_error(&self, description: &str) -> WrapError {
-        WrapError::new(description, &self)
-    }
-}
-
 pub trait ToWrapErrorResult<T> {
     fn wrap(self, description: &str) -> Result<T, WrapError>;
 }
