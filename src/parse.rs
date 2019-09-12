@@ -1,17 +1,11 @@
-use crate::source::Source;
-use crate::error::{WrapError, ToWrapErrorResult};
-use crate::pairs::Pairs;
-use crate::destination::Destination;
-use std::process::exit;
+use crate::error::{ToWrapErrorResult, WrapError};
 use crate::help;
-use std::path::Path;
-use std::ffi::OsStr;
-use serde_json::Value;
-use molysite::hcl::parse_hcl;
-use tera::Context;
 use crate::input::Input;
 use crate::output::Output;
-
+use crate::pairs::Pairs;
+use std::ffi::OsStr;
+use std::path::Path;
+use std::process::exit;
 
 pub fn parse_pairs(pairs_objects: Vec<Pairs>) -> Result<(Vec<Input>, Vec<Output>), WrapError> {
     let mut inputs = vec![];
@@ -24,10 +18,12 @@ pub fn parse_pairs(pairs_objects: Vec<Pairs>) -> Result<(Vec<Input>, Vec<Output>
             let output = Output::try_from_pairs(pairs).wrap("Error parsing output pairs")?;
             outputs.push(output);
         } else {
-            return Err(WrapError::new_first("Error: pairs object without source or destination"))
+            return Err(WrapError::new_first(
+                "Error: pairs object without source or destination",
+            ));
         }
     }
-    return Ok((inputs, outputs))
+    return Ok((inputs, outputs));
 }
 
 pub fn parse_args(mut args: &mut Vec<String>) -> Result<Vec<Pairs>, WrapError> {
@@ -51,7 +47,7 @@ pub fn parse_args(mut args: &mut Vec<String>) -> Result<Vec<Pairs>, WrapError> {
                 Pairs::try_from_args(&mut args)?
             }
             "--out" | "-o" => Pairs::try_from_args(&mut args)?,
-            "--in"  => Pairs::try_from_args(&mut args)?,
+            "--in" => Pairs::try_from_args(&mut args)?,
             "--stdin" | "-i" => {
                 args.push(format!("source=stdin"));
                 Pairs::try_from_args(&mut args)?
@@ -61,9 +57,7 @@ pub fn parse_args(mut args: &mut Vec<String>) -> Result<Vec<Pairs>, WrapError> {
                     .pop()
                     .wrap("error specified --file/-f flag but not context file path provided")?;
 
-                let extension = Path::new(&path)
-                    .extension()
-                    .and_then(OsStr::to_str);
+                let extension = Path::new(&path).extension().and_then(OsStr::to_str);
 
                 if let Some(extension) = extension {
                     args.push(format!("format={}", extension));

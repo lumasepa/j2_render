@@ -15,12 +15,12 @@ use std::{
 
 mod destination;
 mod error;
+mod input;
 mod j2;
+mod output;
 mod pairs;
 mod parse;
 mod source;
-mod input;
-mod output;
 
 use crate::destination::Destination;
 use crate::error::{ToWrapErrorResult, WrapError};
@@ -336,12 +336,9 @@ pub fn cli_main() -> std::result::Result<(), WrapError> {
         let content = input.get_content().wrap("Error getting content of input")?;
         let ctx = input.deserialize(content).wrap("Error deserializing input")?;
         // path jamespath
-
     }
 
-    for output in outputs {
-
-    }
+    for output in outputs {}
 
     Ok(())
     //    let Config {
