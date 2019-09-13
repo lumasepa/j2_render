@@ -4,7 +4,17 @@ in "stdin" {
 
 in "value" {
   as = "numbers[7]"
-  value = 7
+  value = "{{ctx.a.b.c}}"
+}
+
+in "value" {
+  format = "j2"
+  value = <<J2
+  {% for x in y %}
+    . {{y}}
+  {% endfor %}
+  J2
+
 }
 
 in "env" {}
@@ -39,6 +49,8 @@ in "file" {
 }
 
 in "http" {
+  if = "{{obj.bolean_field}}"
+
   method = "GET"
   url = "{{env_ctx.url}}"
   headers {
@@ -59,11 +71,17 @@ out "file" {
 
 out "std" {}
 
-out "http" {
-  method = "POST"
-  url = "{{env_ctx.url_conf}}/{{env_ctx.id}}"
-  headers {
-    X-API-KEY = "{{env_ctx.api_key}}"
+in "if" "{{tera expr}}" {
+  file {}
+}
+
+out "for_each" "{{jmespath_expr}}" {
+  http {
+    method = "POST"
+    url = "{{env_ctx.url_conf}}/{{element.id}}"
+    headers {
+      X-API-KEY = "{{env_ctx.api_key}}"
+    }
+    basic = "{{element.user}}:{{element.password}}"
   }
-  basic = "{{my.user}}:{{secret.password}}"
 }
