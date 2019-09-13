@@ -2,12 +2,12 @@ in "stdin" {
   format = "json"
 }
 
-in "value" {
+in "var" {
   as = "numbers[7]"
   value = "{{ctx.a.b.c}}"
 }
 
-in "value" {
+in "var" {
   format = "j2"
   value = <<J2
   {% for x in y %}
@@ -62,6 +62,8 @@ in "http" {
 }
 
 in "file" {
+  if = "{{ctx.use_template}}"
+
   file = "./template.j2"
 }
 
@@ -71,17 +73,15 @@ out "file" {
 
 out "std" {}
 
-in "if" "{{tera expr}}" {
-  file {}
-}
 
-out "for_each" "{{jmespath_expr}}" {
-  http {
+out "http" {
+    for_each = "{{jmespath_expr}}"
+    if = "{{tera expr}}"
     method = "POST"
     url = "{{env_ctx.url_conf}}/{{element.id}}"
     headers {
       X-API-KEY = "{{env_ctx.api_key}}"
+      Host = "{{rel_host}}"
     }
     basic = "{{element.user}}:{{element.password}}"
-  }
 }

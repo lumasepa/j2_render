@@ -37,7 +37,7 @@ impl Source {
             },
             "http" => panic!("Not implemented yet!"),
             "k8s" => panic!("Not implemented yet!"),
-            _ => return Err(WrapError::new_first(&format!("source {} not recognized", source))),
+            _ => return Err(WrapError::new_first(&format!("source '{}' not recognized", source))),
         };
         return Ok(source);
     }

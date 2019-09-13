@@ -6,22 +6,19 @@ use crate::pairs::Pairs;
 use molysite::types::JsonValue;
 use serde_json::Value;
 use json5;
-
-
-
-
-
-
+use jmespath::Expression;
+use std::ops::Try;
 
 #[derive(Debug)]
 pub struct Pick {
     name: Option<String>,
-    path: String,
-    namespace: Option<String>,
+    expr: Expression<'static>,
 }
 
 #[derive(Debug)]
 pub struct Input {
+    condition: Option<String>,
+    for_each: Option<String>,
     source: Source,
     format: String,
     picks: Vec<Pick>,
@@ -35,17 +32,27 @@ impl Input {
         let path = pairs.get("path").or(pairs.get("p"));
         let namespace = pairs.get("namespace").or(pairs.get("n"));
         let name = pairs.get("as");
+        let condition = pairs.get("if");
+        let for_each = pairs.get("for_each");
         let picks = path.map(|path| {
+            let expr = jmespath::compile(&path).wrap(&format!("Error parsing jmespath : {}", path));
             let mut picks = vec![];
-            let pick = Pick {
-                name,
-                path,
-                namespace: namespace.clone(),
-            };
-            picks.push(pick);
+
+            match expr {
+                Ok(expr) => {
+                    let pick = Pick {
+                        name,
+                        expr,
+                    };
+                    picks.push(pick);
+                },
+                Err(e) => panic!("{}", e),
+            }
             picks
         }).or_else(|| Some(vec![])).unwrap();
         return Ok(Input {
+            condition,
+            for_each,
             source,
             picks,
             namespace,
@@ -113,8 +120,7 @@ impl Input {
         let json_obj = ctx.as_json().wrap("Error converting ctx to json")?;
 
         for pick in self.picks.iter() {
-            let expr = jmespath::compile(&pick.path).wrap(&format!("Error parsing jmespath : {}", pick.path))?;
-            let result = expr.search(&json_obj).wrap(&format!("Error evaluating jmespath : {}", pick.path))?;
+            let result = pick.expr.search(&json_obj).wrap(&format!("Error evaluating jmespath : {}", pick.expr))?;
 
         }
         panic!()

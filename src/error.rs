@@ -11,13 +11,16 @@ impl WrapError {
     pub fn new<T: Display>(description: &str, inner: &T) -> Self {
         let mut description = description.to_string();
         description.push('\n');
-        description += &format!("-> Caused By : {}", inner);
+        let tab_inner = format!("{}", inner).replace("\n", "\n    ");
+        let tab_inner = tab_inner.trim_end();
+        let tab_inner = "    ".to_owned() + tab_inner;
+        description += &format!("-> Caused By : \n{}", tab_inner);
         WrapError {description: description}
     }
     pub fn new_none(description: &str) -> Self {
         let mut description = description.to_string();
         description.push('\n');
-        description += "-> Caused By : None";
+        description += "-> Caused By : \n    None\n";
         WrapError {description: description}
     }
     pub fn new_first(description: &str)  -> Self {

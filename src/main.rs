@@ -1,4 +1,4 @@
-#![feature(or_patterns)]
+#![feature(or_patterns, todo_macro, try_trait)]
 
 use molysite::hcl::parse_hcl;
 use serde_json;

@@ -4,6 +4,7 @@ use std::process::Command;
 use tera::{Error, Result, Value, Context};
 use std::fs;
 use crate::j2::tera::tera_render;
+use crate::error::ToWrapErrorResult;
 
 pub fn render(args: HashMap<String, Value>) -> Result<Value> {
     let path = if let Some(Value::String(path)) = args.get("path") {
@@ -38,6 +39,24 @@ pub fn bash(args: HashMap<String, Value>) -> Result<Value> {
     bash_cmd.arg("-c").arg(command);
 
     return exec_cmd(&mut bash_cmd, command, &args);
+}
+
+pub fn jmespath(args: HashMap<String, Value>) -> Result<Value> {
+    let path = if let Some(Value::String(path)) = args.get("path") {
+        path
+    } else {
+        return Err("jmespath: Invalid type for arg path, expected string".into());
+    };
+    let ctx = if let Some(Value::Object(ctx)) = args.get("ctx") {
+        ctx
+    } else {
+        return Err("jmespath: Invalid type for arg path, expected string".into());
+    };
+    todo!()
+//    use serde_json::Error;
+//    let expr = jmespath::compile(&path).wrap(&format!("Error parsing jmespath : {}", path)).into()?;
+//    let result = expr.search(&ctx).wrap(&format!("Error evaluating jmespath : {}", path)).into()?;
+//    return Ok(result)
 }
 
 pub fn tab_all_lines(args: HashMap<String, Value>) -> Result<Value> {
