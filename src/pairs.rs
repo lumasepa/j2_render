@@ -1,9 +1,19 @@
 use crate::error::{ToWrapErrorResult, WrapError};
+use std::fmt::{Display, Error as FmtError, Formatter};
 use std::slice::Iter;
 
 #[derive(Debug)]
 pub struct Pairs {
     inner: Vec<(String, String)>,
+}
+
+impl Display for Pairs {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), FmtError> {
+        for (k, v) in self.inner.iter() {
+            write!(f, "{}={}\n", k, v)?;
+        }
+        Ok(())
+    }
 }
 
 impl Pairs {
@@ -25,6 +35,25 @@ impl Pairs {
             .rev()
             .find(|(k, _)| key == *k)
             .map(|(_, v)| v.to_owned())
+    }
+
+    pub fn get_couples<T: PartialEq<String> + Display>(&self, first: T, second: T) -> Vec<(String, Option<String>)> {
+        let mut couples = vec![];
+        let mut iter = self.inner.iter();
+        while let Some((key_first, value_first)) = iter.next() {
+            if first == *key_first {
+                if let Some((key_second, value_second)) = iter.next() {
+                    if second == *key_second {
+                        couples.push((value_first.to_owned(), Some(value_second.to_owned())))
+                    } else {
+                        couples.push((value_first.to_owned(), None))
+                    }
+                } else {
+                    couples.push((value_first.to_owned(), None))
+                }
+            }
+        }
+        return couples;
     }
 
     pub fn remove_all(&mut self, key: String) {

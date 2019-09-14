@@ -50,7 +50,7 @@ in "file" {
 
 in "http" {
   if = "{{obj.bolean_field}}"
-
+  format = "json"
   method = "GET"
   url = "{{env_ctx.url}}"
   headers {
@@ -78,10 +78,10 @@ out "http" {
     for_each = "{{jmespath_expr}}"
     if = "{{tera expr}}"
     method = "POST"
-    url = "{{env_ctx.url_conf}}/{{element.id}}"
+    url = "{{env_ctx.url_conf}}/{{for.element.id}}"
     headers {
       X-API-KEY = "{{env_ctx.api_key}}"
       Host = "{{rel_host}}"
     }
-    basic = "{{element.user}}:{{element.password}}"
+    basic = "{{for.element.user}}:{{for.element.password}}"
 }

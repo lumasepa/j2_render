@@ -1,13 +1,12 @@
-use molysite::hcl::parse_hcl;
-use crate::error::{WrapError, ToWrapErrorResult};
-use tera::Context;
-use crate::source::Source;
+use crate::error::{ToWrapErrorResult, WrapError};
 use crate::pairs::Pairs;
+use crate::source::Source;
+use jmespath::Expression;
+use json5;
+use molysite::hcl::parse_hcl;
 use molysite::types::JsonValue;
 use serde_json::Value;
-use json5;
-use jmespath::Expression;
-use std::ops::Try;
+use tera::Context;
 
 #[derive(Debug)]
 pub struct Pick {
@@ -17,8 +16,8 @@ pub struct Pick {
 
 #[derive(Debug)]
 pub struct Input {
-    condition: Option<String>,
     for_each: Option<String>,
+    condition: Option<String>,
     source: Source,
     format: String,
     picks: Vec<Pick>,
@@ -28,28 +27,27 @@ pub struct Input {
 impl Input {
     pub fn try_from_pairs(pairs: Pairs) -> Result<Input, WrapError> {
         let source = Source::try_from_pairs(&pairs).wrap("Error parsing source from pairs")?;
-        let format = pairs.get("format").or(pairs.get("f")).wrap("Expected format=")?;
-        let path = pairs.get("path").or(pairs.get("p"));
-        let namespace = pairs.get("namespace").or(pairs.get("n"));
-        let name = pairs.get("as");
+        let format = pairs
+            .get("format")
+            .or(pairs.get("f"))
+            .or(source.try_get_format())
+            .wrap(&format!("Expected format= in pairs :\n{}\n", pairs))?;
+        let namespace = pairs.get("as");
         let condition = pairs.get("if");
         let for_each = pairs.get("for_each");
-        let picks = path.map(|path| {
-            let expr = jmespath::compile(&path).wrap(&format!("Error parsing jmespath : {}", path));
-            let mut picks = vec![];
-
-            match expr {
-                Ok(expr) => {
-                    let pick = Pick {
-                        name,
-                        expr,
-                    };
-                    picks.push(pick);
-                },
-                Err(e) => panic!("{}", e),
-            }
-            picks
-        }).or_else(|| Some(vec![])).unwrap();
+        let picks = pairs
+            .get_couples("path", "as")
+            .iter()
+            .map(|(path, name)| {
+                let expr = jmespath::compile(&path)
+                    .wrap(&format!("Error parsing jmespath : {}", path))
+                    .unwrap();
+                Pick {
+                    name: name.to_owned(),
+                    expr,
+                }
+            })
+            .collect();
         return Ok(Input {
             condition,
             for_each,
@@ -60,13 +58,12 @@ impl Input {
         });
     }
 
-    pub fn get_content(&self) -> Result<String, WrapError>{
+    pub fn get_content(&self) -> Result<String, WrapError> {
         self.source.get_content()
     }
 
     pub fn deserialize(&self, data: String) -> Result<Context, WrapError> {
         let mut context = Context::new();
-
         match self.format.as_ref() {
             "yaml" | "yml" => {
                 let value: serde_yaml::Value = serde_yaml::from_str(&data).wrap("Error parsing yaml")?;
@@ -120,8 +117,10 @@ impl Input {
         let json_obj = ctx.as_json().wrap("Error converting ctx to json")?;
 
         for pick in self.picks.iter() {
-            let result = pick.expr.search(&json_obj).wrap(&format!("Error evaluating jmespath : {}", pick.expr))?;
-
+            let result = pick
+                .expr
+                .search(&json_obj)
+                .wrap(&format!("Error evaluating jmespath : {}", pick.expr))?;
         }
         panic!()
     }

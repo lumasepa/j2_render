@@ -1,4 +1,4 @@
-#![feature(or_patterns, todo_macro, try_trait)]
+#![feature(or_patterns, todo_macro)]
 
 use molysite::hcl::parse_hcl;
 use serde_json;
@@ -29,7 +29,18 @@ use crate::parse::{parse_args, parse_pairs};
 use crate::source::Source;
 use serde_json::Value;
 
-pub fn help() {
+pub fn help(topic: Option<String>) {
+    if let Some(topic) = topic {
+        match topic.as_ref() {
+            "template_engine" => {}
+            "jmespath" => {}
+            "ops_file" => {}
+            "pair_args" => {}
+            _ => {}
+        };
+        return;
+    }
+
     println!(
         "
 render [FLAGS]
@@ -105,6 +116,7 @@ render [FLAGS]
     --out/-o DESTINATION [OUTPUT_MANIPULATION]
 
     --help/-h   -- shows this help
+    --help/-h [template_engine,jmespath,ops_file,pair_args]  -- shows documentation of topic
     --print-inputs -- print inputs and exits
 
     Options:
@@ -309,14 +321,6 @@ pub fn main() {
     }
 }
 
-pub fn print_pairs(pairs: &Pairs) {
-    print!("{} ", '{');
-    for (k, v) in pairs.iter() {
-        print!("{}={} ", k, v)
-    }
-    println!("{}", '}');
-}
-
 pub fn cli_main() -> std::result::Result<(), WrapError> {
     let mut args = env::args().collect::<Vec<String>>();
 
@@ -326,7 +330,7 @@ pub fn cli_main() -> std::result::Result<(), WrapError> {
     let mut template: Option<String> = None;
 
     for pairs in pairs_objects.iter() {
-        print_pairs(&pairs);
+        println!("{}---------------------", pairs)
     }
 
     let (inputs, outputs) = parse_pairs(pairs_objects).wrap("Error parsing pairs")?;

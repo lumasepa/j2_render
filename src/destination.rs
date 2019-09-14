@@ -1,29 +1,63 @@
+use crate::error::{ToWrapErrorResult, WrapError};
 use crate::pairs::Pairs;
-use crate::error::{WrapError, ToWrapErrorResult};
-use std::path::Path;
 use std::ffi::OsStr;
+use std::path::Path;
 
 #[derive(Debug)]
 pub enum Destination {
-    File { path: String, format: Option<String> },
+    File {
+        path: String,
+        format: Option<String>,
+    },
     StdOut,
-    Http { url: String },
-    K8s { resource: String, uri: String }
+    Http {
+        method: String,
+        url: String,
+        headers: Vec<(String, String)>,
+    },
+    K8s {
+        resource: String,
+        uri: String,
+    },
 }
 
 impl Destination {
     pub fn try_from_pairs(pairs: &Pairs) -> Result<Self, WrapError> {
-        let destination = pairs.get("destination").or(pairs.get("d")).unwrap_or("stdout".to_string());
+        let destination = pairs
+            .get("destination")
+            .or(pairs.get("d"))
+            .unwrap_or("stdout".to_string());
         let destination = match destination.as_ref() {
-            "file" => Destination::File{
+            "file" => Destination::File {
                 path: pairs.get("file").wrap("Expected file path in out file")?.to_owned(),
-                format: Path::new(&pairs.get("file").unwrap()).extension().and_then(OsStr::to_str).and_then(|f| Some(f.to_string()))
+                format: Path::new(&pairs.get("file").unwrap())
+                    .extension()
+                    .and_then(OsStr::to_str)
+                    .and_then(|f| Some(f.to_string())),
             },
-            "stdout" => Destination::StdOut,
-            "http" => panic!("Not implemented yet!"),
+            "std" => Destination::StdOut,
+            "http" => Destination::Http {
+                method: pairs.get("method").or(Some("GET".to_string())).unwrap(),
+                url: pairs.get("url").wrap("Error 'url' not found for destination=http")?,
+                headers: pairs
+                    .get_couples("header", "value")
+                    .iter()
+                    .filter_map(|(k, v)| {
+                        if let Some(v) = v {
+                            return Some((k.to_owned(), v.to_owned()));
+                        }
+                        None
+                    })
+                    .collect(),
+            },
             "k8s" => panic!("Not implemented yet!"),
-            _ => return Err(WrapError::new_first(&format!("destination {} not recognized", destination))),
+            _ => {
+                return Err(WrapError::new_first(&format!(
+                    "destination {} not recognized",
+                    destination
+                )))
+            }
         };
-        return Ok(destination)
+        return Ok(destination);
     }
 }

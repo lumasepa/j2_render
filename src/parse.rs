@@ -1,23 +1,23 @@
+use crate::destination::Destination;
 use crate::error::{ToWrapErrorResult, WrapError};
 use crate::help;
 use crate::input::Input;
 use crate::output::Output;
 use crate::pairs::Pairs;
+use crate::source::Source;
+use molysite::hcl::parse_hcl;
+use serde_json::{Map, Value};
 use std::ffi::OsStr;
 use std::path::Path;
 use std::process::exit;
-use crate::destination::Destination;
-use crate::source::Source;
-use molysite::hcl::{parse_hcl};
-use serde_json::{Value, Map};
 
 macro_rules! get_value {
     ($data:ident, $typ:path) => {
         match $data {
             $typ(data) => data,
-            _ => Err(WrapError::new_first(&format!("Error parsing hcl of ops file")))?
+            _ => Err(WrapError::new_first(&format!("Error parsing hcl of ops file")))?,
         }
-    }
+    };
 }
 
 pub fn parse_pairs(pairs_objects: Vec<Pairs>) -> Result<(Vec<Input>, Vec<Output>), WrapError> {
@@ -43,9 +43,9 @@ pub fn parse_output_ops(output: Map<String, Value>) -> Result<Pairs, WrapError> 
     let mut pairs = Pairs::new();
     for (k, v) in output.iter() {
         pairs.insert("destination".to_string(), k.to_owned());
-        let body : &Vec<Value> = get_value!(v, Value::Array);
+        let body: &Vec<Value> = get_value!(v, Value::Array);
         let body = body.get(0).wrap("Error parsing hcl of ops file")?;
-        let body : &Map<String, Value> = get_value!(body, Value::Object);
+        let body: &Map<String, Value> = get_value!(body, Value::Object);
         for (k, v) in body {
             match k.as_str() {
                 "headers" => {
@@ -65,18 +65,18 @@ pub fn parse_output_ops(output: Map<String, Value>) -> Result<Pairs, WrapError> 
                 }
             }
         }
-    };
+    }
 
-    return Ok(pairs)
+    return Ok(pairs);
 }
 
 pub fn parse_input_ops(input: Map<String, Value>) -> Result<Pairs, WrapError> {
     let mut pairs = Pairs::new();
     for (k, v) in input.iter() {
         pairs.insert("source".to_string(), k.to_owned());
-        let body : &Vec<Value> = get_value!(v, Value::Array);
+        let body: &Vec<Value> = get_value!(v, Value::Array);
         let body = body.get(0).wrap("Error parsing hcl of ops file")?;
-        let body : &Map<String, Value> = get_value!(body, Value::Object);
+        let body: &Map<String, Value> = get_value!(body, Value::Object);
         for (k, v) in body {
             match k.as_str() {
                 "pick" => {
@@ -87,10 +87,9 @@ pub fn parse_input_ops(input: Map<String, Value>) -> Result<Pairs, WrapError> {
                         let path: &String = get_value!(path, Value::String);
                         let name = pick.get("as").wrap("Error expected as in pick")?;
                         let name: &String = get_value!(name, Value::String);
-                        pairs.insert("path".to_string(),path.to_owned());
+                        pairs.insert("path".to_string(), path.to_owned());
                         pairs.insert("as".to_string(), name.to_owned());
                     }
-
                 }
                 "headers" => {
                     let headers: &Vec<Value> = get_value!(v, Value::Array);
@@ -109,16 +108,17 @@ pub fn parse_input_ops(input: Map<String, Value>) -> Result<Pairs, WrapError> {
                 }
             }
         }
-    };
+    }
 
-    return Ok(pairs)
+    return Ok(pairs);
 }
 
 pub fn parse_ops_file(path: String) -> Result<Vec<Pairs>, WrapError> {
     let file = Source::File { path: path.clone() };
     let ops = file.get_content()?;
     let json_ast = parse_hcl(&ops).wrap(&format!("Error parsing hcl of ops file {}", path))?;
-    let json_ast = json_ast.to_string()
+    let json_ast = json_ast
+        .to_string()
         .parse::<serde_json::Value>()
         .wrap(&format!("Error parsing to json the hcl of ops file {}", path))?;
 
@@ -126,19 +126,23 @@ pub fn parse_ops_file(path: String) -> Result<Vec<Pairs>, WrapError> {
 
     let mut pairs_objs: Vec<Pairs> = vec![];
 
-    let inputs : Vec<Value> = if let Some(inputs) = root.get("in") {
+    let inputs: Vec<Value> = if let Some(inputs) = root.get("in") {
         get_value!(inputs, Value::Array).to_owned()
-    } else { vec![] };
+    } else {
+        vec![]
+    };
 
     for input in inputs {
-        let input : Map<String, Value> = get_value!(input, Value::Object);
+        let input: Map<String, Value> = get_value!(input, Value::Object);
         let input_pairs = parse_input_ops(input)?;
         pairs_objs.push(input_pairs);
     }
 
     let outputs = if let Some(outputs) = root.get("out") {
         get_value!(outputs, Value::Array).to_owned()
-    } else { vec![] };
+    } else {
+        vec![]
+    };
 
     for output in outputs {
         let output = get_value!(output, Value::Object);
@@ -159,10 +163,10 @@ pub fn parse_args(mut args: &mut Vec<String>) -> Result<Vec<Pairs>, WrapError> {
             "--ops" => {
                 let path = args
                     .pop()
-                    .wrap("error specified --ops flag but not file path provided")?;
+                    .wrap("Error specified --ops flag but not file path provided")?;
                 let mut pairs_objs = parse_ops_file(path)?;
                 parsed_args.append(&mut pairs_objs);
-            },
+            }
             "--var" | "-v" => {
                 let variable = args
                     .pop()
@@ -172,7 +176,7 @@ pub fn parse_args(mut args: &mut Vec<String>) -> Result<Vec<Pairs>, WrapError> {
                 let key = parts.pop().wrap("Error no key=value found")?;
                 args.push("source=var".to_string());
                 args.push(format!("value={}", value));
-                args.push(format!("namespace={}", key));
+                args.push(format!("as={}", key));
                 parsed_args.push(Pairs::try_from_args(&mut args)?);
             }
             "--out" | "-o" => parsed_args.push(Pairs::try_from_args(&mut args)?),
@@ -185,12 +189,6 @@ pub fn parse_args(mut args: &mut Vec<String>) -> Result<Vec<Pairs>, WrapError> {
                 let path = args
                     .pop()
                     .wrap("error specified --file/-f flag but not context file path provided")?;
-
-                let extension = Path::new(&path).extension().and_then(OsStr::to_str);
-
-                if let Some(extension) = extension {
-                    args.push(format!("format={}", extension));
-                }
 
                 args.push(format!("source=file"));
                 args.push(format!("file={}", path));
@@ -205,11 +203,11 @@ pub fn parse_args(mut args: &mut Vec<String>) -> Result<Vec<Pairs>, WrapError> {
                     }
                 }
                 args.push("source=env".to_string());
-                args.push("format=json".to_string());
                 parsed_args.push(Pairs::try_from_args(&mut args)?);
             }
             "--help" | "help" | "-h" => {
-                help();
+                let topic = args.pop();
+                help(topic);
                 exit(0);
             }
             _ => panic!("Error argument {} not recognized", arg),
