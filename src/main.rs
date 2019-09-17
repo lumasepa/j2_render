@@ -13,6 +13,7 @@ use std::{
 };
 
 mod destination;
+#[macro_use]
 mod error;
 mod input;
 mod j2;

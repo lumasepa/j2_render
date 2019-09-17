@@ -1,7 +1,7 @@
-use tera::{Tera, Context};
 use crate::j2::{filters, functions, testers};
+use tera::{Context, Tera};
 
-pub fn tera_render(template: String, context: Context) -> String {
+pub fn tera_render(template: String, context: &Context) -> String {
     // TODO evaluate lazzy static to avoid recreation of tera
     let mut tera = Tera::default();
     tera.add_raw_template("template", &template)
@@ -30,5 +30,5 @@ pub fn tera_render(template: String, context: Context) -> String {
     tera.register_tester("file", testers::is_file);
     tera.register_tester("directory", testers::is_directory);
 
-    tera.render("template", &context).expect("Error rendering template")
+    tera.render("template", context).expect("Error rendering template")
 }

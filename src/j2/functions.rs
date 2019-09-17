@@ -1,10 +1,10 @@
-use crate::j2::inners::exec_cmd;
-use std::collections::HashMap;
-use std::process::Command;
-use tera::{Error, Result, Value, Context};
-use std::fs;
-use crate::j2::tera::tera_render;
 use crate::error::ToWrapErrorResult;
+use crate::j2::inners::exec_cmd;
+use crate::j2::tera::tera_render;
+use std::collections::HashMap;
+use std::fs;
+use std::process::Command;
+use tera::{Context, Error, Result, Value};
 
 pub fn render(args: HashMap<String, Value>) -> Result<Value> {
     let path = if let Some(Value::String(path)) = args.get("path") {
@@ -24,8 +24,8 @@ pub fn render(args: HashMap<String, Value>) -> Result<Value> {
     let mut template_ctx = Context::new();
     template_ctx.insert("ctx", ctx);
 
-    let result = tera_render(template, template_ctx);
-    return Ok(Value::String(result))
+    let result = tera_render(template, &template_ctx);
+    return Ok(Value::String(result));
 }
 
 pub fn bash(args: HashMap<String, Value>) -> Result<Value> {
@@ -53,10 +53,10 @@ pub fn jmespath(args: HashMap<String, Value>) -> Result<Value> {
         return Err("jmespath: Invalid type for arg path, expected string".into());
     };
     todo!()
-//    use serde_json::Error;
-//    let expr = jmespath::compile(&path).wrap(&format!("Error parsing jmespath : {}", path)).into()?;
-//    let result = expr.search(&ctx).wrap(&format!("Error evaluating jmespath : {}", path)).into()?;
-//    return Ok(result)
+    //    use serde_json::Error;
+    //    let expr = jmespath::compile(&path).wrap(&format!("Error parsing jmespath : {}", path)).into()?;
+    //    let result = expr.search(&ctx).wrap(&format!("Error evaluating jmespath : {}", path)).into()?;
+    //    return Ok(result)
 }
 
 pub fn tab_all_lines(args: HashMap<String, Value>) -> Result<Value> {

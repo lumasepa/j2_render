@@ -1,4 +1,5 @@
 use crate::error::{ToWrapErrorResult, WrapError};
+use crate::j2::tera::tera_render;
 use crate::pairs::Pairs;
 use crate::source::Source;
 use jmespath::Expression;
@@ -16,10 +17,23 @@ pub struct Pick {
 
 #[derive(Debug)]
 pub struct Input {
-    for_each: Option<String>,
+    // TODO rename to input template same for source, output and destination
+    for_each: Option<Expression<'static>>,
     condition: Option<String>,
+
+    source: Source,
+
+    format: Option<String>,
+
+    picks: Vec<Pick>,
+    namespace: Option<String>,
+}
+
+#[derive(Debug)]
+pub struct RenderedInput {
     source: Source,
     format: String,
+
     picks: Vec<Pick>,
     namespace: Option<String>,
 }
@@ -27,14 +41,14 @@ pub struct Input {
 impl Input {
     pub fn try_from_pairs(pairs: Pairs) -> Result<Input, WrapError> {
         let source = Source::try_from_pairs(&pairs).wrap("Error parsing source from pairs")?;
-        let format = pairs
-            .get("format")
-            .or(pairs.get("f"))
-            .or(source.try_get_format())
-            .wrap(&format!("Expected format= in pairs :\n{}\n", pairs))?;
+        let format = pairs.get("format").or(pairs.get("f"));
         let namespace = pairs.get("as");
         let condition = pairs.get("if");
-        let for_each = pairs.get("for_each");
+        let for_each = pairs.get("for_each").map(|for_each| {
+            jmespath::compile(&for_each)
+                .wrap(&format!("Error parsing jmespath : {}", for_each))
+                .unwrap()
+        });
         let picks = pairs
             .get_couples("path", "as")
             .iter()
@@ -58,13 +72,36 @@ impl Input {
         });
     }
 
+    pub fn render(&self, ctx: &Context) -> Vec<Input> {
+        if let Some(for_each) = &self.for_each {
+        } else {
+            let cond = if let Some(condition) = &self.condition {
+                let result = tera_render(condition.to_owned(), ctx);
+                result.as_str() == "true"
+            } else {
+                true
+            };
+            if cond {
+                let source = self.source.render(ctx).wrap("Error");
+            }
+        }
+        todo!()
+    }
+
     pub fn get_content(&self) -> Result<String, WrapError> {
         self.source.get_content()
     }
 
     pub fn deserialize(&self, data: String) -> Result<Context, WrapError> {
         let mut context = Context::new();
-        match self.format.as_ref() {
+        let source_format = self.source.try_get_format();
+        let format = self
+            .format
+            .as_ref()
+            .or(source_format.as_ref())
+            .ok_or(wrap_err!("Error format not found for Input {:?}", &self))?;
+
+        match format.as_str() {
             "yaml" | "yml" => {
                 let value: serde_yaml::Value = serde_yaml::from_str(&data).wrap("Error parsing yaml")?;
                 let object = value.as_mapping().wrap("Error expected object in root of yaml file")?;
@@ -108,7 +145,7 @@ impl Input {
                     context.insert(k, v);
                 }
             }
-            _ => return Err(WrapError::new_first(&format!("Format {} not recognized", self.format))),
+            _ => return Err(wrap_err!("Format {} not recognized", format)),
         }
         Ok(context)
     }

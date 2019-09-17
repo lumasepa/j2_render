@@ -1,4 +1,5 @@
 use crate::error::{ToWrapErrorResult, WrapError};
+use crate::j2::tera::tera_render;
 use crate::pairs::Pairs;
 use reqwest::Url;
 use std::collections::HashMap;
@@ -119,5 +120,30 @@ impl Source {
             Source::K8s { .. } => panic!(""),
         };
         Ok(data)
+    }
+
+    pub fn render(&self, ctx: &Context) -> Result<Source, WrapError> {
+        let source = match self {
+            Source::File { path } => Source::File {
+                path: tera_render(path.to_owned(), ctx),
+            },
+            Source::StdIn => Source::StdIn,
+            Source::Env { key } => Source::Env {
+                key: key.as_ref().map(|key| tera_render(key.to_owned(), ctx)),
+            },
+            Source::Var { value } => Source::Var {
+                value: tera_render(value.to_owned(), ctx),
+            },
+            Source::Http { method, url, headers } => Source::Http {
+                method: tera_render(method.to_owned(), ctx),
+                url: tera_render(url.to_owned(), ctx),
+                headers: headers
+                    .iter()
+                    .map(|(k, v)| (tera_render(k.to_owned(), ctx), tera_render(v.to_owned(), ctx)))
+                    .collect(),
+            },
+            Source::K8s { .. } => panic!(""),
+        };
+        Ok(source)
     }
 }
