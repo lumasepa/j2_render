@@ -5,6 +5,9 @@ use std::path::Path;
 
 #[derive(Debug)]
 pub enum Destination {
+    Bash {
+        script: String,
+    },
     File {
         path: String,
         format: Option<String>,

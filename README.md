@@ -10,14 +10,19 @@ may be some differences between implementations, so look at tera's documentation
 * ~~json5 input~~ 
 * new args format
 * yaml output
+* toml output
 * http input
 * http output
+* bash input
+* bash output
 * k8s input
 * k8s output
 * path
 * as
 * csv input
 * csv output
+* unify errors
+* better error messages
 
 ## Installation
 
@@ -30,7 +35,7 @@ sudo chmod +x /usr/local/bin/j2_render
 ## Working with the Context
 
 The context in j2_render is a json.
-The context can be loaded from different formats and ways.
+The context can be loaded from different formats and in different ways.
 The context is populated in args order so last arg overwrites keys of previous ones
 
 ### Supported Context formats

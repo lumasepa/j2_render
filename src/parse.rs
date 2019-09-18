@@ -1,7 +1,7 @@
 
 use crate::error::{ToWrapErrorResult, WrapError};
 use crate::help;
-use crate::input::Input;
+use crate::input::RawInput;
 use crate::output::Output;
 use crate::pairs::Pairs;
 use crate::source::Source;
@@ -20,12 +20,12 @@ macro_rules! get_value {
     };
 }
 
-pub fn parse_pairs(pairs_objects: Vec<Pairs>) -> Result<(Vec<Input>, Vec<Output>), WrapError> {
+pub fn parse_pairs(pairs_objects: Vec<Pairs>) -> Result<(Vec<RawInput>, Vec<Output>), WrapError> {
     let mut inputs = vec![];
     let mut outputs = vec![];
     for pairs in pairs_objects {
         if pairs.is_input() {
-            let input = Input::try_from_pairs(pairs).wrap("Error parsing input pairs")?;
+            let input = RawInput::try_from_pairs(pairs).wrap("Error parsing input pairs")?;
             inputs.push(input);
         } else if pairs.is_output() {
             let output = Output::try_from_pairs(pairs).wrap("Error parsing output pairs")?;

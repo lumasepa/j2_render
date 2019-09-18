@@ -10,8 +10,11 @@ use std::path::Path;
 use std::{env, fs, io};
 use tera::Context;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Source {
+    Bash {
+        script: String,
+    },
     File {
         path: String,
     },

@@ -326,11 +326,13 @@ pub fn cli_main() -> std::result::Result<(), WrapError> {
 
     let (inputs, outputs) = parse_pairs(pairs_objects).wrap("Error parsing pairs")?;
 
-    for input in inputs {
-        let content = input.get_content().wrap("Error getting content of input")?;
-        let ctx = input.deserialize(content).wrap("Error deserializing input")?;
-        let _ctx = input.filter_by_jmespath(ctx).wrap("Error applying jmespath")?;
-        // path jamespath
+    for raw_input in inputs {
+        let rendered_inputs = raw_input.render(&mut context).wrap("")?;
+        for rendered_input in rendered_inputs {
+            let content = rendered_input.get_content().wrap("Error getting content of input")?;
+            let ctx = rendered_input.deserialize(content).wrap("Error deserializing input")?;
+            let ctx = rendered_input.filter_by_jmespath(ctx).wrap("Error applying jmespath")?;
+        }
     }
 
     for _output in outputs {}
