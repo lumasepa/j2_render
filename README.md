@@ -7,14 +7,13 @@ may be some differences between implementations, so look at tera's documentation
 
 ## TODO
 
-* json5 input
+* ~~json5 input~~ 
 * new args format
 * yaml output
 * http input
 * http output
 * k8s input
 * k8s output
-* namespace
 * path
 * as
 * csv input

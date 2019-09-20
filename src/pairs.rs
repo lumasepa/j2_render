@@ -90,16 +90,17 @@ impl Pairs {
                 args.push(arg);
                 break;
             }
-            let (key, value) = Self::parse_pair(&arg).wrap(&format!("Error parsing pair {}", arg))?;
+            let (key, value) = wrap_result!(Self::parse_pair(&arg), "Error parsing pair {}", arg)?;
             pairs.insert(key, value);
         }
         Ok(pairs)
     }
 
     fn parse_pair(pair: &str) -> Result<(String, String), WrapError> {
-        let mut pair: Vec<&str> = pair.splitn(2, '=').collect();
-        let value = pair.pop().wrap("Expected key=value pattern, key not found")?;
-        let key = pair.pop().wrap("Expected key=value pattern, value not found")?;
+        let mut pair_v: Vec<&str> = pair.splitn(2, '=').collect();
+        let value = wrap_result!(pair_v.pop(), "Expected key=value pattern, value not found : {}", pair)?;
+        let key = wrap_result!(pair_v.pop(), "Expected key=value pattern, key not found : {}", pair)?;
+
         Ok((key.to_string(), value.to_string()))
     }
 

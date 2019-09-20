@@ -1,6 +1,7 @@
 use crate::error::{ToWrapErrorResult, WrapError};
 use crate::j2::tera::tera_render;
 use crate::pairs::Pairs;
+use reqwest::header::HeaderMap;
 use reqwest::Url;
 use std::collections::HashMap;
 use std::ffi::OsStr;
@@ -91,7 +92,7 @@ impl Source {
     pub fn get_content(&self) -> Result<String, WrapError> {
         let data = match self {
             Source::File { path } => {
-                let data = fs::read_to_string(&path).wrap(&format!("Error reading file {}", path))?;
+                let data = wrap_result!(fs::read_to_string(&path), "Error reading file {}", path)?;
                 data
             }
             Source::StdIn => {
@@ -116,7 +117,23 @@ impl Source {
                 ctx.as_json().wrap("Error transforming env to json")?.to_string()
             }
             Source::Var { value } => value.to_owned(),
-            Source::Http { .. } => panic!(""),
+            Source::Http { method, url, headers } => {
+                let client = reqwest::Client::new();
+                let request = match method.as_ref() {
+                    "GET" => client.get(url),
+                    "POST" => client.post(url),
+                    "PUT" => client.put(url),
+                    "DELETE" => client.delete(url),
+                    _ => panic!(),
+                };
+                let mut _headers = HeaderMap::new();
+                //                for (k, v) in headers {
+                //                    _headers.insert(k, v);
+                //                }
+                let response = request.headers(_headers).send();
+
+                panic!()
+            }
             Source::K8s { .. } => panic!(""),
         };
         Ok(data)

@@ -1,3 +1,4 @@
+#[macro_use]
 use crate::error::{ToWrapErrorResult, WrapError};
 use crate::pairs::Pairs;
 use std::ffi::OsStr;
@@ -29,7 +30,7 @@ impl Destination {
             .unwrap_or("stdout".to_string());
         let destination = match destination.as_ref() {
             "file" => Destination::File {
-                path: pairs.get("file").wrap("Expected file path in out file")?.to_owned(),
+                path: wrap_result!(pairs.get("file"), "Expected file path in out file {}", pairs)?.to_owned(),
                 format: Path::new(&pairs.get("file").unwrap())
                     .extension()
                     .and_then(OsStr::to_str)
@@ -38,7 +39,11 @@ impl Destination {
             "std" => Destination::StdOut,
             "http" => Destination::Http {
                 method: pairs.get("method").or(Some("GET".to_string())).unwrap(),
-                url: pairs.get("url").wrap("Error 'url' not found for destination=http")?,
+                url: wrap_result!(
+                    pairs.get("url"),
+                    "Error 'url' not found for destination=http : {}",
+                    pairs
+                )?,
                 headers: pairs
                     .get_couples("header", "value")
                     .iter()

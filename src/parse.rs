@@ -116,11 +116,13 @@ pub fn parse_input_ops(input: Map<String, Value>) -> Result<Pairs, WrapError> {
 pub fn parse_ops_file(path: String) -> Result<Vec<Pairs>, WrapError> {
     let file = Source::File { path: path.clone() };
     let ops = file.get_content()?;
-    let json_ast = parse_hcl(&ops).wrap(&format!("Error parsing hcl of ops file {}", path))?;
-    let json_ast = json_ast
-        .to_string()
-        .parse::<serde_json::Value>()
-        .wrap(&format!("Error parsing to json the hcl of ops file {}", path))?;
+    let json_ast = parse_hcl(&ops);
+    let json_ast = wrap_result!(json_ast.as_ref(), "Error parsing hcl of ops file {}", path)?;
+    let json_ast = wrap_result!(
+        json_ast.to_string().parse::<serde_json::Value>(),
+        "Error parsing to json the hcl of ops file {}",
+        path
+    )?;
 
     let root = get_value!(json_ast, Value::Object);
 

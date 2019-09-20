@@ -9,6 +9,14 @@ mod macros {
             WrapError::new_first(&format!($fstr, $($es,)*))
         };
     }
+    macro_rules! wrap_result {
+        ($fstr:literal, $($es:expr),*) => {
+            Err(WrapError::new_first(&format!($fstr, $($es,)*)))
+        };
+        ($err:expr, $fstr:literal, $($es:expr),*) => {
+            $err.wrap(&format!($fstr, $($es,)*))
+        };
+    }
 }
 
 #[derive(Debug)]

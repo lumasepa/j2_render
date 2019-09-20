@@ -12,9 +12,9 @@ use std::{
     path::Path,
 };
 
-mod destination;
 #[macro_use]
 mod error;
+mod destination;
 mod input;
 mod j2;
 mod output;

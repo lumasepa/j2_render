@@ -73,7 +73,6 @@ out "file" {
 
 out "std" {}
 
-
 out "http" {
     for_each = "{{jmespath_expr}}"
     if = "{{tera expr}}"
