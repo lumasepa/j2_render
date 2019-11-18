@@ -5,13 +5,8 @@ use crate::source::Source;
 use jmespath::Expression;
 use json5;
 use molysite::hcl::parse_hcl;
+use serde_json::Value;
 use tera::Context;
-
-#[derive(Debug)]
-pub struct Pick {
-    name: Option<String>,
-    path: String,
-}
 
 #[derive(Debug)]
 pub struct RawInput {
@@ -21,8 +16,6 @@ pub struct RawInput {
     source: Source,
 
     format: Option<String>,
-
-    picks: Vec<Pick>,
     namespace: Option<String>,
 }
 
@@ -31,24 +24,51 @@ pub struct RenderedInput {
     source: Source,
 
     format: Option<String>,
-
-    picks: Vec<Pick>,
     namespace: Option<String>,
 }
 
+pub enum CtxOrTemplate {
+    Ctx(Context),
+    Template(String),
+}
+
+use CtxOrTemplate::*;
+
 impl RenderedInput {
-    pub fn get_content(&self) -> Result<String, WrapError> {
+    pub fn resolve(&self) -> Result<CtxOrTemplate, WrapError> {
+        let format = self.get_format()?;
+        let content = self.get_content().wrap("Error getting content of input")?;
+
+        if ["j2", "tpl", "template"].contains(&format.as_str()) {
+            return Ok(Template(content));
+        } else {
+            let mut ctx = self.deserialize(content).wrap("Error deserializing input")?;
+            if let Some(namespace) = &self.namespace {
+                let mut new_ctx = Context::new();
+                new_ctx.insert(namespace, &ctx);
+                ctx = new_ctx
+            }
+            return Ok(Ctx(ctx));
+        }
+    }
+
+    fn get_content(&self) -> Result<String, WrapError> {
         self.source.get_content()
     }
 
-    pub fn deserialize(&self, data: String) -> Result<Context, WrapError> {
-        let mut context = Context::new();
+    fn get_format(&self) -> Result<String, WrapError> {
         let source_format = self.source.try_get_format();
         let format = self
             .format
             .as_ref()
             .or(source_format.as_ref())
             .ok_or(wrap_err!("Error format not found for Input {:?}", &self))?;
+        Ok(format.to_owned())
+    }
+
+    fn deserialize(&self, data: String) -> Result<Context, WrapError> {
+        let mut context = Context::new();
+        let format = self.get_format()?;
 
         match format.as_str() {
             "yaml" | "yml" => {
@@ -123,19 +143,6 @@ impl RenderedInput {
         }
         Ok(context)
     }
-
-    pub fn filter_by_jmespath(&self, ctx: Context) -> Result<Context, WrapError> {
-        let json_obj = ctx.as_json().wrap("Error converting ctx to json")?;
-
-        for pick in self.picks.iter() {
-            let result = wrap_result!(pick.expr.search(&json_obj), "Error evaluating jmespath : {}", pick.expr)?;
-            //            let result = pick
-            //                .path
-            //                .search(&json_obj)
-            //                .wrap(&format!("Error evaluating jmespath : {}", pick.path))?;
-        }
-        panic!()
-    }
 }
 
 impl RawInput {
@@ -149,19 +156,10 @@ impl RawInput {
                 .wrap(&format!("Error parsing jmespath : {}", for_each))
                 .unwrap()
         });
-        let picks = pairs
-            .get_couples("path", "as")
-            .iter()
-            .map(|(path, name)| Pick {
-                name: name.to_owned(),
-                path: path.to_owned(),
-            })
-            .collect();
         return Ok(RawInput {
             condition,
             for_each,
             source,
-            picks,
             namespace,
             format,
         });
@@ -179,20 +177,11 @@ impl RawInput {
             };
             for element in elements {
                 ctx.insert("element", element);
-                let picks = self
-                    .picks
-                    .iter()
-                    .map(|pick| Pick {
-                        path: pick.path.clone(),
-                        name: pick.name.clone(),
-                    })
-                    .collect();
                 let input = RawInput {
                     for_each: None,
                     condition: self.condition.clone(),
                     source: self.source.clone(),
                     format: self.format.clone(),
-                    picks,
                     namespace: self.namespace.clone(),
                 };
                 let mut rendered_input = input.render(ctx).wrap("")?;
@@ -210,19 +199,10 @@ impl RawInput {
                 let source = self.source.render(ctx).wrap("Error")?;
                 let format = self.format.as_ref().map(|f| tera_render(f.to_owned(), ctx));
                 let namespace = self.namespace.as_ref().map(|n| tera_render(n.to_owned(), ctx));
-                let picks = self
-                    .picks
-                    .iter()
-                    .map(|pick| Pick {
-                        path: pick.path.clone(),
-                        name: pick.name.as_ref().map(|n| tera_render(n.to_owned(), ctx)),
-                    })
-                    .collect();
                 rendered_inputs.push(RenderedInput {
                     source,
                     format,
                     namespace,
-                    picks,
                 })
             }
         }

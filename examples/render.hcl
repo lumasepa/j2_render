@@ -36,16 +36,6 @@ in "file" {
 
 in "file" {
   file = "./ctx.toml"
-
-  pick {
-    path = "obj.field[2].user"
-    as = "user.username"
-  }
-
-  pick {
-    path = "obj.field[2].roles"
-    as = "user.roles"
-  }
 }
 
 in "http" {

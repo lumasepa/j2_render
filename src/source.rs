@@ -12,9 +12,6 @@ use tera::Context;
 
 #[derive(Debug, Clone)]
 pub enum Source {
-    Bash {
-        script: String,
-    },
     File {
         path: String,
     },
@@ -120,7 +117,11 @@ impl Source {
                 ctx.as_json().wrap("Error transforming env to json")?.to_string()
             }
             Source::Var { value } => value.to_owned(),
-            Source::Http { method, url, headers: _ } => {
+            Source::Http {
+                method,
+                url,
+                headers: _,
+            } => {
                 let client = reqwest::Client::new();
                 let request = match method.as_ref() {
                     "GET" => client.get(url),
