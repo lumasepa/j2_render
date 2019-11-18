@@ -1,4 +1,3 @@
-#[macro_use]
 use crate::error::{ToWrapErrorResult, WrapError};
 use crate::pairs::Pairs;
 use std::ffi::OsStr;

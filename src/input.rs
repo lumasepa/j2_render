@@ -5,8 +5,8 @@ use crate::source::Source;
 use jmespath::Expression;
 use json5;
 use molysite::hcl::parse_hcl;
-use molysite::types::JsonValue;
-use serde_json::Value;
+
+
 use tera::Context;
 
 #[derive(Debug)]
@@ -73,7 +73,7 @@ impl Input {
     }
 
     pub fn render(&self, ctx: &Context) -> Vec<Input> {
-        if let Some(for_each) = &self.for_each {
+        if let Some(_for_each) = &self.for_each {
         } else {
             let cond = if let Some(condition) = &self.condition {
                 let result = tera_render(condition.to_owned(), ctx);
@@ -82,7 +82,7 @@ impl Input {
                 true
             };
             if cond {
-                let source = self.source.render(ctx).wrap("Error");
+                let _source = self.source.render(ctx).wrap("Error");
             }
         }
         todo!()
@@ -179,7 +179,7 @@ impl Input {
         let json_obj = ctx.as_json().wrap("Error converting ctx to json")?;
 
         for pick in self.picks.iter() {
-            let result = wrap_result!(pick.expr.search(&json_obj), "Error evaluating jmespath : {}", pick.expr)?;
+            let _result = wrap_result!(pick.expr.search(&json_obj), "Error evaluating jmespath : {}", pick.expr)?;
         }
         panic!()
     }

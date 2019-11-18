@@ -1,16 +1,10 @@
-#![feature(or_patterns, todo_macro)]
+#![feature(or_patterns)]
+#![allow(dead_code, incomplete_features)]
 
-use molysite::hcl::parse_hcl;
-use serde_json;
-use serde_yaml;
-use tera::{Context, Tera};
+use tera::Context;
 
+use std::env;
 use std::process::exit;
-use std::{
-    env, fs,
-    io::{self, Read},
-    path::Path,
-};
 
 #[macro_use]
 mod error;
@@ -22,13 +16,9 @@ mod pairs;
 mod parse;
 mod source;
 
-use crate::destination::Destination;
 use crate::error::{ToWrapErrorResult, WrapError};
-use crate::j2::tera::tera_render;
-use crate::pairs::Pairs;
+
 use crate::parse::{parse_args, parse_pairs};
-use crate::source::Source;
-use serde_json::Value;
 
 pub fn help(topic: Option<String>) {
     if let Some(topic) = topic {
@@ -327,8 +317,8 @@ pub fn cli_main() -> std::result::Result<(), WrapError> {
 
     let pairs_objects = parse_args(&mut args).wrap("Error parsing args")?;
 
-    let mut context = Context::new();
-    let mut template: Option<String> = None;
+    let _context = Context::new();
+    let _template: Option<String> = None;
 
     for pairs in pairs_objects.iter() {
         println!("{}---------------------", pairs)
@@ -339,11 +329,11 @@ pub fn cli_main() -> std::result::Result<(), WrapError> {
     for input in inputs {
         let content = input.get_content().wrap("Error getting content of input")?;
         let ctx = input.deserialize(content).wrap("Error deserializing input")?;
-        let ctx = input.filter_by_jmespath(ctx).wrap("Error applying jmespath")?;
+        let _ctx = input.filter_by_jmespath(ctx).wrap("Error applying jmespath")?;
         // path jamespath
     }
 
-    for output in outputs {}
+    for _output in outputs {}
 
     Ok(())
     //    let Config {

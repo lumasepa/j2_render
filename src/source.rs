@@ -117,7 +117,7 @@ impl Source {
                 ctx.as_json().wrap("Error transforming env to json")?.to_string()
             }
             Source::Var { value } => value.to_owned(),
-            Source::Http { method, url, headers } => {
+            Source::Http { method, url, headers: _ } => {
                 let client = reqwest::Client::new();
                 let request = match method.as_ref() {
                     "GET" => client.get(url),
@@ -130,7 +130,7 @@ impl Source {
                 //                for (k, v) in headers {
                 //                    _headers.insert(k, v);
                 //                }
-                let response = request.headers(_headers).send();
+                let _response = request.headers(_headers).send();
 
                 panic!()
             }

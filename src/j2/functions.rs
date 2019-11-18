@@ -1,4 +1,4 @@
-use crate::error::ToWrapErrorResult;
+
 use crate::j2::inners::exec_cmd;
 use crate::j2::tera::tera_render;
 use std::collections::HashMap;
@@ -42,12 +42,12 @@ pub fn bash(args: HashMap<String, Value>) -> Result<Value> {
 }
 
 pub fn jmespath(args: HashMap<String, Value>) -> Result<Value> {
-    let path = if let Some(Value::String(path)) = args.get("path") {
+    let _path = if let Some(Value::String(path)) = args.get("path") {
         path
     } else {
         return Err("jmespath: Invalid type for arg path, expected string".into());
     };
-    let ctx = if let Some(Value::Object(ctx)) = args.get("ctx") {
+    let _ctx = if let Some(Value::Object(ctx)) = args.get("ctx") {
         ctx
     } else {
         return Err("jmespath: Invalid type for arg path, expected string".into());

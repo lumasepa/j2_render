@@ -61,8 +61,8 @@ impl Pairs {
             .inner
             .iter()
             .enumerate()
-            .filter(|(i, (k, v))| *k == key)
-            .map(|(i, (k, v))| i)
+            .filter(|(_i, (k, _v))| *k == key)
+            .map(|(i, (_k, _v))| i)
             .collect();
 
         for id in to_remove {
@@ -75,8 +75,8 @@ impl Pairs {
             .inner
             .iter()
             .enumerate()
-            .find(|(i, (k, v))| *k == key)
-            .map(|(id, (k, v))| id);
+            .find(|(_i, (k, _v))| *k == key)
+            .map(|(id, (_k, _v))| id);
 
         if let Some(id) = to_remove {
             self.inner.remove(id);
