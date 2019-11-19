@@ -11,14 +11,6 @@ may be some differences between implementations, so look at tera's documentation
 * new args format
 * yaml output
 * toml output
-* http input
-* http output
-* bash input
-* bash output
-* k8s input
-* k8s output
-* path
-* as
 * csv input
 * csv output
 * unify errors
@@ -45,9 +37,6 @@ The context is populated in args order so last arg overwrites keys of previous o
 * toml
 * hcl/tf/tfvars
 * key=value
-
-#### Future Supported
-* http/s + json/yaml/toml/hcl/tf/tfvars `format+https?://...`
 
 ### Supported Context Inputs
 

@@ -37,12 +37,12 @@ use CtxOrTemplate::*;
 impl RenderedInput {
     pub fn resolve(&self) -> Result<CtxOrTemplate, WrapError> {
         let format = self.get_format()?;
-        let content = self.get_content().wrap("Error getting content of input")?;
+        let content = self.get_content().wrap_err("Error getting content of input")?;
 
         if ["j2", "tpl", "template"].contains(&format.as_str()) {
             return Ok(Template(content));
         } else {
-            let mut ctx = self.deserialize(content).wrap("Error deserializing input")?;
+            let mut ctx = self.deserialize(content).wrap_err("Error deserializing input")?;
             if let Some(namespace) = &self.namespace {
                 let mut new_ctx = Context::new();
                 new_ctx.insert(namespace, &ctx);
@@ -147,13 +147,13 @@ impl RenderedInput {
 
 impl RawInput {
     pub fn try_from_pairs(pairs: Pairs) -> Result<RawInput, WrapError> {
-        let source = Source::try_from_pairs(&pairs).wrap("Error parsing source from pairs")?;
+        let source = Source::try_from_pairs(&pairs).wrap_err("Error parsing source from pairs")?;
         let format = pairs.get("format").or(pairs.get("f"));
         let namespace = pairs.get("as");
         let condition = pairs.get("if");
         let for_each = pairs.get("for_each").map(|for_each| {
             jmespath::compile(&for_each)
-                .wrap(&format!("Error parsing jmespath : {}", for_each))
+                .wrap_err(&format!("Error parsing jmespath : {}", for_each))
                 .unwrap()
         });
         return Ok(RawInput {
@@ -168,8 +168,8 @@ impl RawInput {
     pub fn render(&self, ctx: &mut Context) -> Result<Vec<RenderedInput>, WrapError> {
         let mut rendered_inputs = vec![];
         if let Some(for_each) = &self.for_each {
-            let json_obj = ctx.as_json().wrap("Error converting ctx to json")?;
-            let elements = for_each.search(json_obj).wrap("")?;
+            let json_obj = ctx.as_json().wrap_err("Error converting ctx to json")?;
+            let elements = for_each.search(json_obj).wrap_err("")?;
             let elements = if let Some(elements) = elements.as_array() {
                 elements
             } else {
@@ -184,7 +184,7 @@ impl RawInput {
                     format: self.format.clone(),
                     namespace: self.namespace.clone(),
                 };
-                let mut rendered_input = input.render(ctx).wrap("")?;
+                let mut rendered_input = input.render(ctx).wrap_err("")?;
                 rendered_inputs.append(&mut rendered_input);
             }
             ctx.insert("element", &Value::Null)
@@ -196,7 +196,7 @@ impl RawInput {
                 true
             };
             if cond {
-                let source = self.source.render(ctx).wrap("Error")?;
+                let source = self.source.render(ctx).wrap_err("Error")?;
                 let format = self.format.as_ref().map(|f| tera_render(f.to_owned(), ctx));
                 let namespace = self.namespace.as_ref().map(|n| tera_render(n.to_owned(), ctx));
                 rendered_inputs.push(RenderedInput {

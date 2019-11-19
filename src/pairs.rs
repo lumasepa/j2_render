@@ -37,52 +37,6 @@ impl Pairs {
             .map(|(_, v)| v.to_owned())
     }
 
-    pub fn get_couples<T: PartialEq<String> + Display>(&self, first: T, second: T) -> Vec<(String, Option<String>)> {
-        let mut couples = vec![];
-        let mut iter = self.inner.iter();
-        while let Some((key_first, value_first)) = iter.next() {
-            if first == *key_first {
-                if let Some((key_second, value_second)) = iter.next() {
-                    if second == *key_second {
-                        couples.push((value_first.to_owned(), Some(value_second.to_owned())))
-                    } else {
-                        couples.push((value_first.to_owned(), None))
-                    }
-                } else {
-                    couples.push((value_first.to_owned(), None))
-                }
-            }
-        }
-        return couples;
-    }
-
-    pub fn remove_all(&mut self, key: String) {
-        let to_remove: Vec<usize> = self
-            .inner
-            .iter()
-            .enumerate()
-            .filter(|(_i, (k, _v))| *k == key)
-            .map(|(i, (_k, _v))| i)
-            .collect();
-
-        for id in to_remove {
-            self.inner.remove(id);
-        }
-    }
-
-    pub fn remove_first(&mut self, key: String) {
-        let to_remove = self
-            .inner
-            .iter()
-            .enumerate()
-            .find(|(_i, (k, _v))| *k == key)
-            .map(|(id, (_k, _v))| id);
-
-        if let Some(id) = to_remove {
-            self.inner.remove(id);
-        }
-    }
-
     pub fn try_from_args(args: &mut Vec<String>) -> Result<Pairs, WrapError> {
         let mut pairs = Pairs::new();
         while let Some(arg) = args.pop() {
@@ -102,13 +56,5 @@ impl Pairs {
         let key = wrap_result!(pair_v.pop(), "Expected key=value pattern, key not found : {}", pair)?;
 
         Ok((key.to_string(), value.to_string()))
-    }
-
-    pub fn is_input(&self) -> bool {
-        self.get("source").or(self.get("s")).is_some()
-    }
-
-    pub fn is_output(&self) -> bool {
-        self.get("destination").or(self.get("d")).is_some()
     }
 }

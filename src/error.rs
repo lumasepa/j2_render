@@ -1,4 +1,3 @@
-
 use std::error::Error;
 use std::fmt::{Display, Error as FmtError, Formatter};
 
@@ -14,7 +13,7 @@ mod macros {
             Err(WrapError::new_first(&format!($fstr, $($es,)*)))
         };
         ($err:expr, $fstr:literal, $($es:expr),*) => {
-            $err.wrap(&format!($fstr, $($es,)*))
+            $err.wrap_err(&format!($fstr, $($es,)*))
         };
     }
 }
@@ -60,20 +59,20 @@ impl Display for WrapError {
 impl Error for WrapError {}
 
 pub trait ToWrapErrorResult<T> {
-    fn wrap(self, description: &str) -> Result<T, WrapError>;
+    fn wrap_err(self, description: &str) -> Result<T, WrapError>;
 }
 
 impl<T, E> ToWrapErrorResult<T> for Result<T, E>
 where
     E: Display,
 {
-    fn wrap(self, description: &str) -> Result<T, WrapError> {
+    fn wrap_err(self, description: &str) -> Result<T, WrapError> {
         self.map_err(|err| WrapError::new(description, &err))
     }
 }
 
 impl<T> ToWrapErrorResult<T> for Option<T> {
-    fn wrap(self, description: &str) -> Result<T, WrapError> {
+    fn wrap_err(self, description: &str) -> Result<T, WrapError> {
         self.ok_or(WrapError::new_none(description))
     }
 }
