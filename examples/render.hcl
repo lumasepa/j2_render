@@ -34,11 +34,11 @@ file {
   as = "env_ctx"
 }
 
-in "file" {
+file {
   file = "./ctx.toml"
 }
 
-in "file" {
+file {
   if = "{{ctx.use_template}}"
 
   file = "./template.j2"

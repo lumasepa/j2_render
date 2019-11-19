@@ -66,9 +66,9 @@ render [FLAGS]
 
     Workflow:
 
-    inputs.iter |> read input |> parse input |> transform to json |> context
+    inputs.for_each |> input.if |> render input |> read input |> transform to json |> context
 
-    context |> template ? render template : context |> outputs
+    context |> render template |> outputs
 
 
     FLAGS:
@@ -115,8 +115,7 @@ render [FLAGS]
         JMES_PATH = jmespath expression -- http://jmespath.org/tutorial.html
 
         Formats:
-            ENCODINGS: base64
-            INPUT_DATA_FORMATS: ENCODING?+(json5,json,yaml,hcl,tfvars,tf,csv)
+            INPUT_DATA_FORMATS: json5,json,yaml,hcl,tfvars,tf,csv
             TEMPLATE_FORMATS : template,j2,tpl
             INPUT_FORMATS : INPUT_DATA_FORMATS + TEMPLATE_FORMATS
     "
@@ -132,7 +131,10 @@ pub fn main() {
 
 pub fn cli_main() -> std::result::Result<(), WrapError> {
     let mut args = env::args().collect::<Vec<String>>();
-
+    if args.len() == 1 {
+        help(None);
+        return Ok(());
+    }
     let (pairs_objects, output_path) = parse_args(&mut args).wrap_err("Error parsing args")?;
 
     let mut context = Context::new();

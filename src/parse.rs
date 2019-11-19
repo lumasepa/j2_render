@@ -26,17 +26,14 @@ pub fn parse_pairs(pairs_objects: Vec<Pairs>) -> Result<Vec<RawInput>, WrapError
     return Ok(inputs);
 }
 
-pub fn parse_input_ops(input: Map<String, Value>) -> Result<Pairs, WrapError> {
+pub fn parse_input_ops(source_type: &String, source: &Value) -> Result<Pairs, WrapError> {
     let mut pairs = Pairs::new();
-    for (k, v) in input.iter() {
-        pairs.insert("source".to_string(), k.to_owned());
-        let body: &Vec<Value> = get_value!(v, Value::Array);
-        let body = body.get(0).wrap_err("Error parsing hcl of ops file")?;
-        let body: &Map<String, Value> = get_value!(body, Value::Object);
-        for (k, v) in body {
-            let value: &String = get_value!(v, Value::String);
-            pairs.insert(k.to_owned(), value.to_owned());
-        }
+    pairs.insert("source".to_string(), source_type.to_owned());
+    let body: &Map<String, Value> = get_value!(source, Value::Object);
+
+    for (k, v) in body {
+        let value: &String = get_value!(v, Value::String);
+        pairs.insert(k.to_owned(), value.to_owned());
     }
 
     return Ok(pairs);
@@ -57,18 +54,12 @@ pub fn parse_ops_file(path: String) -> Result<Vec<Pairs>, WrapError> {
 
     let mut pairs_objs: Vec<Pairs> = vec![];
 
-    todo!();
-
-    let inputs: Vec<Value> = if let Some(inputs) = root.get("in") {
-        get_value!(inputs, Value::Array).to_owned()
-    } else {
-        vec![]
-    };
-
-    for input in inputs {
-        let input: Map<String, Value> = get_value!(input, Value::Object);
-        let input_pairs = parse_input_ops(input)?;
-        pairs_objs.push(input_pairs);
+    for (source_type, sources) in root {
+        let sources = get_value!(sources, Value::Array);
+        for source in sources {
+            let input_pairs = parse_input_ops(&source_type, &source)?;
+            pairs_objs.push(input_pairs);
+        }
     }
 
     Ok(pairs_objs)

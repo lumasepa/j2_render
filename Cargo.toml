@@ -20,15 +20,6 @@ base64 = "0.10.1"
 molysite = { git = "https://github.com/evq/molysite" }
 jmespath = "0.2.0"
 
-[[bin]]
-name = "j2_render"
-path = "src/main.rs"
-
-
-[[bin]]
-name = "hcl2json"
-path = "src/hcl2json.rs"
-
 [profile.release]
 lto = true
 codegen-units = 1
