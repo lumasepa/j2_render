@@ -13,6 +13,7 @@ use std::{
     path::Path,
 };
 use tera::{Context, Tera};
+use anyhow::{Result, Context as AnyhowContext, anyhow};
 
 mod filters;
 mod functions;
@@ -46,6 +47,9 @@ j2_render [FLAGS]
     --var/-v VAR   -- adds a pair key value to the context or a template depending on format
     --print-ctx/-p   -- print the context as json and exits
     --help/-h   -- shows this help
+
+    VAR: key[+FORMAT]=value
+    FORMAT: yaml yml json toml tml hcl tfvars tf
     "
     )
 }
@@ -60,7 +64,7 @@ fn extract_format(string: &str) -> Option<(String,String)> {
     return Some((format.to_string(), other.to_string()))
 }
 
-pub fn parse_args() -> Config {
+pub fn parse_args() -> Result<Config> {
     let mut args = env::args().collect::<Vec<String>>();
     args.reverse();
 
@@ -78,48 +82,55 @@ pub fn parse_args() -> Config {
             "--var" | "-v" => {
                 let variable = args
                     .pop()
-                    .expect("error specified --var/-v flag but not value provided");
+                    .ok_or(anyhow!("error specified --var/-v flag but not value provided"))?;
                 let mut parts : Vec<&str> = variable.splitn(2, '=').collect();
-                let key = parts.pop().expect("Error no key=value found");
-                let value = parts.pop().expect("Error no key=value found");
+                let key = parts.pop().ok_or(anyhow!("Error no key=value found"))?;
+                let value = parts.pop().ok_or(anyhow!("Error no key=value found"))?;
 
                 if let Some((format, key)) = extract_format(key) {
-                    process_inputs(&mut config, format, value.to_string());
+                    process_inputs(&mut config, format, value.to_string()).context("Error processing inputs from --var arg")?;
                 } else {
-                    config.context.insert(&key, &value)
+                    config.context.insert(key, &value)
                 }
             }
             "--print-ctx" | "-p" => config.print_ctx = true,
             "--out" | "-o" => {
                 let filepath = args
                     .pop()
-                    .expect("error specified --out/-o flag but not file path provided");
+                    .ok_or(anyhow!("error specified --out/-o flag but not file path provided"))?;
                 config.out_file = Some(filepath);
             }
             "--stdin" | "-i" => {
                 let format = args
                     .pop()
-                    .expect("error specified --stdin/-i flag but not format provided");
+                    .ok_or(anyhow!("error specified --stdin/-i flag but not format provided"))?;
                 let mut data = String::new();
-                io::stdin().read_to_string(&mut data).expect("Error readinf from stdin");
-                process_inputs(&mut config, format, data);
+                io::stdin().read_to_string(&mut data).context("Error readinf from stdin")?;
+                process_inputs(&mut config, format, data).context("Error parsing inputs from --stdin")?;
             }
             "--file" | "-f" => {
                 let path = args
                     .pop()
-                    .expect("error specified --file/-f flag but not context file path provided");
+                    .ok_or(anyhow!("error specified --file/-f flag but not context file path provided"))?;
                 let (format, path) = if let Some((format, path)) = extract_format(&path) {
                     (format, path)
                 } else {
                     let extension = Path::new(&path)
                         .extension()
                         .and_then(OsStr::to_str)
-                        .expect("Error no extension found in ctx file");
+                        .ok_or(anyhow!("Error no extension found in ctx file"))?;
                     (extension.to_string(), path)
                 };
 
-                let data = fs::read_to_string(&path).expect(&format!("Error reading context file {}", path));
-                process_inputs(&mut config, format, data);
+                let data = fs::read_to_string(&path).with_context(|| format!("Error reading context file {}", path))?;
+                process_inputs(&mut config, format, data).with_context(|| format!("Error parsing inputs from --file {}", path))?;
+            }
+            "--template" | "-t" => {
+                let path = args
+                    .pop()
+                    .ok_or(anyhow!("error specified --template/-t flag but not context file path provided"))?;
+                let data = fs::read_to_string(&path).with_context(|| format!("Error reading template file {}", path))?;
+                process_inputs(&mut config, "tpl".into(), data).with_context(|| format!("Error parsing inputs from --file {}", path))?;
             }
             "--env" | "-e" => {
                 let env_vars = env::vars().collect::<HashMap<String, String>>();
@@ -134,67 +145,69 @@ pub fn parse_args() -> Config {
             _ => panic!("Error argument {} not recognized", arg),
         }
     }
-    return config;
+    return Ok(config);
 }
 
-pub fn process_inputs(mut config: &mut Config, format: String, data: String) {
+pub fn process_inputs(mut config: &mut Config, format: String, data: String) -> Result<()> {
     if format == "template" || format == "tpl" || format == "j2" {
         config.template = data
     } else {
-        populate_ctx(&mut config.context, format, data);
+        populate_ctx(&mut config.context, format, data)?;
     }
+    Ok(())
 }
 
-pub fn populate_ctx(context: &mut Context, format: String, data: String) {
+pub fn populate_ctx(context: &mut Context, format: String, data: String) -> Result<()> {
     match format.as_ref() {
         "yaml" | "yml" => {
-            let value: serde_yaml::Value = serde_yaml::from_str(&data).expect("Error parsing yaml");
-            let object = value.as_mapping().expect("Error expected object in root of yaml file");
+            let value: serde_yaml::Value = serde_yaml::from_str(&data).context("Error parsing yaml")?;
+            let object = value.as_mapping().context("Error expected object in root of yaml file")?;
             for (k, v) in object.iter() {
-                let k = k.as_str().expect("Error decoding key of yaml, key is not a string");
+                let k = k.as_str().context("Error decoding key of yaml, key is not a string")?;
                 context.insert(k, v);
             }
         }
         "json" => {
-            let value = data.parse::<serde_json::Value>().expect("Error parsing json");
-            let object = value.as_object().expect("Error expected object in root of json file");
+            let value = data.parse::<serde_json::Value>().context("Error parsing json")?;
+            let object = value.as_object().context("Error expected object in root of json file")?;
             for (k, v) in object.iter() {
                 context.insert(k, v);
             }
         }
         "toml" | "tml" => {
-            let value = data.parse::<toml::Value>().expect("Error parsing toml");
-            let object = value.as_table().expect("Error expected object in root of toml file");
+            let value = data.parse::<toml::Value>().context("Error parsing toml")?;
+            let object = value.as_table().context("Error expected object in root of toml file")?;
             for (k, v) in object.iter() {
                 context.insert(k, v);
             }
         }
         "hcl" | "tfvars" | "tf" => {
-            let value = parse_hcl(&data).expect("Error parsing hcl/tf/tfvars");
-            let value = value.to_string().parse::<serde_json::Value>().expect("Error parsing json of hcl/tf/tfvars");
+            let value = parse_hcl(&data).map_err(|e| anyhow!("Error {} parsing hcl/tf/tfvars", e))?;
+            let value = value.to_string().parse::<serde_json::Value>().context("Error parsing json of hcl/tf/tfvars")?;
 
             let object = value
                 .as_object()
-                .expect("Error expected object in root of hcl/tf/tfvars file");
+                .context("Error expected object in root of hcl/tf/tfvars file")?;
             for (k, v) in object.iter() {
                 context.insert(k, v);
             }
         }
         _ => panic!("Format {} not recognized", format),
     }
+    Ok(())
 }
 
-pub fn main() -> std::result::Result<(), String> {
-    let Config{template, context,print_ctx, out_file } = parse_args();
+pub fn main() -> Result<()> {
+    let Config { template, context, print_ctx, out_file } = parse_args()?;
 
     if print_ctx {
-        println!("{}", context.as_json().expect("Error encoding ctx as json").to_string());
+        println!("{}", context.into_json().to_string());
         exit(0)
     }
 
     let mut tera = Tera::default();
     tera.add_raw_template("template", &template)
-        .expect("Error loading template in engine");
+        .context("Error loading template in engine")?;
 
     tera.register_filter("bash", filters::bash);
     tera.register_filter("sed", filters::sed);
@@ -210,24 +223,24 @@ pub fn main() -> std::result::Result<(), String> {
     tera.register_filter("to_json", filters::str);
     tera.register_filter("from_json", filters::from_json);
 
-    tera.register_function("tab_all_lines", Box::new(functions::tab_all_lines));
-    tera.register_function("bash", Box::new(functions::bash));
-    tera.register_function("str", Box::new(functions::str));
-    tera.register_function("to_json", Box::new(functions::str));
-    tera.register_function("from_json", Box::new(functions::from_json));
+    tera.register_function("tab_all_lines", functions::tab_all_lines);
+    tera.register_function("bash", functions::bash);
+    tera.register_function("str", functions::str);
+    tera.register_function("to_json", functions::str);
+    tera.register_function("from_json", functions::from_json);
 
     tera.register_tester("file", testers::is_file);
     tera.register_tester("directory", testers::is_directory);
 
-    let rendered = tera.render("template", &context).expect("Error rendering template");
+    let rendered = tera.render("template", &context).context("Error rendering template")?;
 
     if let Some(filepath) = out_file {
-        let mut file = fs::File::create(&filepath).expect("Error creating output file");
-        file.write_all(rendered.as_ref()).expect("Error writing to output file");
+        let mut file = fs::File::create(&filepath).context("Error creating output file")?;
+        file.write_all(rendered.as_ref()).context("Error writing to output file")?;
     } else {
         io::stdout()
             .write_all(rendered.as_ref())
-            .expect("Error writing to stdout");
+            .context("Error writing to stdout")?;
     }
 
     Ok(())

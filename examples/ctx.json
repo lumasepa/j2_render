@@ -4,7 +4,7 @@
   "my_float": 1.2,
   "my_array": [ "this is", "a list of", "three strings"],
   "my_obj": {"a":  "a", "b": "b"},
-  "comple_obj": {
+  "complex_obj": {
     "1": 1,
     "obj": {
       "a": "a"

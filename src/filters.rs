@@ -6,8 +6,9 @@ use std::fs;
 use std::path::Path;
 use std::process::Command;
 use tera::{Result, Value};
+use anyhow::Context;
 
-pub fn bash(piped_arg: Value, args: HashMap<String, Value>) -> Result<Value> {
+pub fn bash(piped_arg: &Value, args: &HashMap<String, Value>) -> Result<Value> {
     let data = if let Value::String(data) = piped_arg {
         data
     } else {
@@ -30,7 +31,7 @@ pub fn bash(piped_arg: Value, args: HashMap<String, Value>) -> Result<Value> {
     return exec_cmd(&mut bash_cmd, command, &args);
 }
 
-pub fn sed(piped_arg: Value, args: HashMap<String, Value>) -> Result<Value> {
+pub fn sed(piped_arg: &Value, args: &HashMap<String, Value>) -> Result<Value> {
     let data = if let Value::String(data) = piped_arg {
         data
     } else {
@@ -53,7 +54,7 @@ pub fn sed(piped_arg: Value, args: HashMap<String, Value>) -> Result<Value> {
     return exec_cmd(&mut bash_cmd, &command, &args);
 }
 
-pub fn file_glob(piped_arg: Value, _: HashMap<String, Value>) -> Result<Value> {
+pub fn file_glob(piped_arg: &Value, _: &HashMap<String, Value>) -> Result<Value> {
     let mut files_matched = vec![];
 
     if let Value::String(path) = piped_arg {
@@ -73,7 +74,7 @@ pub fn file_glob(piped_arg: Value, _: HashMap<String, Value>) -> Result<Value> {
     }
 }
 
-pub fn read_file(piped_arg: Value, _: HashMap<String, Value>) -> Result<Value> {
+pub fn read_file(piped_arg: &Value, _: &HashMap<String, Value>) -> Result<Value> {
     if let Value::String(path) = piped_arg {
         match fs::read_to_string(path) {
             Ok(contents) => return Ok(Value::String(contents)),
@@ -84,7 +85,7 @@ pub fn read_file(piped_arg: Value, _: HashMap<String, Value>) -> Result<Value> {
     }
 }
 
-pub fn file_name(piped_arg: Value, _: HashMap<String, Value>) -> Result<Value> {
+pub fn file_name(piped_arg: &Value, _: &HashMap<String, Value>) -> Result<Value> {
     if let Value::String(path) = piped_arg {
         let path = Path::new(&path);
         let file_name = match path.file_name() {
@@ -101,7 +102,7 @@ pub fn file_name(piped_arg: Value, _: HashMap<String, Value>) -> Result<Value> {
     }
 }
 
-pub fn file_dir(piped_arg: Value, _: HashMap<String, Value>) -> Result<Value> {
+pub fn file_dir(piped_arg: &Value, _: &HashMap<String, Value>) -> Result<Value> {
     if let Value::String(path) = piped_arg {
         let path = Path::new(&path);
         let file_name = match path.parent() {
@@ -118,7 +119,7 @@ pub fn file_dir(piped_arg: Value, _: HashMap<String, Value>) -> Result<Value> {
     }
 }
 
-pub fn strip_line_breaks(piped_arg: Value, _: HashMap<String, Value>) -> Result<Value> {
+pub fn strip_line_breaks(piped_arg: &Value, _: &HashMap<String, Value>) -> Result<Value> {
     if let Value::String(lines) = piped_arg {
         return Ok(Value::String(lines.replace("\n", "")));
     } else {
@@ -126,7 +127,7 @@ pub fn strip_line_breaks(piped_arg: Value, _: HashMap<String, Value>) -> Result<
     }
 }
 
-pub fn remove_extension(piped_arg: Value, _: HashMap<String, Value>) -> Result<Value> {
+pub fn remove_extension(piped_arg: &Value, _: &HashMap<String, Value>) -> Result<Value> {
     if let Value::String(filename) = piped_arg {
         let mut parts: Vec<_> = filename.split('.').collect();
         parts.pop();
@@ -137,7 +138,7 @@ pub fn remove_extension(piped_arg: Value, _: HashMap<String, Value>) -> Result<V
     }
 }
 
-pub fn b64encode(piped_arg: Value, _: HashMap<String, Value>) -> Result<Value> {
+pub fn b64encode(piped_arg: &Value, _: &HashMap<String, Value>) -> Result<Value> {
     if let Value::String(data) = piped_arg {
         let encoded_data = base64::encode(&data);
         return Ok(Value::String(encoded_data));
@@ -146,7 +147,7 @@ pub fn b64encode(piped_arg: Value, _: HashMap<String, Value>) -> Result<Value> {
     }
 }
 
-pub fn b64decode(piped_arg: Value, _: HashMap<String, Value>) -> Result<Value> {
+pub fn b64decode(piped_arg: &Value, _: &HashMap<String, Value>) -> Result<Value> {
     if let Value::String(data) = piped_arg {
         return base64::decode(&data)
             .map_err(|e| format!("b64decode: decoding error : {}", e).into())
@@ -160,15 +161,16 @@ pub fn b64decode(piped_arg: Value, _: HashMap<String, Value>) -> Result<Value> {
     }
 }
 
-pub fn str(piped_arg: Value, _: HashMap<String, Value>) -> Result<Value> {
+pub fn str(piped_arg: &Value, _: &HashMap<String, Value>) -> Result<Value> {
     return Ok(Value::String(piped_arg.to_string()));
 }
 
-pub fn from_json(piped_arg: Value, _: HashMap<String, Value>) -> Result<Value> {
+pub fn from_json(piped_arg: &Value, _: &HashMap<String, Value>) -> Result<Value> {
     if let Value::String(data) = piped_arg {
         let value = data
             .parse::<serde_json::Value>()
-            .expect(&format!("from_json: error parsing json : {}", data));
+            .context(format!("from_json: error parsing json : {}", data))
+            .map_err(|e| e.to_string())?;
         return Ok(value);
     } else {
         return Err("from_json: Invalid type, expected string".into());

@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::process::Command;
 use tera::{Result, Value};
+use anyhow::Context;
 
 pub fn exec_cmd(command: &mut Command, cmd_str: &str, env: &HashMap<String, Value>) -> Result<Value> {
     for (k, v) in env.iter() {
@@ -13,10 +14,15 @@ pub fn exec_cmd(command: &mut Command, cmd_str: &str, env: &HashMap<String, Valu
     }
     let out = command
         .output()
-        .expect(&format!("Error executing command : {}", cmd_str));
+        .context(format!("Error executing command : {}", cmd_str))
+        .map_err(|e| e.to_string())?;
 
-    let stdout = String::from_utf8(out.stdout).expect(&format!("bash: Error reading stdout of command {}", cmd_str));
-    let stderr = String::from_utf8(out.stderr).expect(&format!("bash: Error reading stderr of command {}", cmd_str));
+    let stdout = String::from_utf8(out.stdout)
+        .context(format!("bash: Error reading stdout of command {}", cmd_str))
+        .map_err(|e| e.to_string())?;
+    let stderr = String::from_utf8(out.stderr)
+        .context(format!("bash: Error reading stderr of command {}", cmd_str))
+        .map_err(|e| e.to_string())?;
     if stderr != "" {
         eprintln!("command {} stderr : {}", cmd_str, stderr);
     }

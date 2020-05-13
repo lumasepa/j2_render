@@ -2,8 +2,9 @@ use crate::inners::exec_cmd;
 use std::collections::HashMap;
 use std::process::Command;
 use tera::{Error, Result, Value};
+use anyhow::Context;
 
-pub fn bash(args: HashMap<String, Value>) -> Result<Value> {
+pub fn bash(args: &HashMap<String, Value>) -> Result<Value> {
     let command = if let Some(Value::String(command)) = args.get("command") {
         command
     } else {
@@ -16,7 +17,7 @@ pub fn bash(args: HashMap<String, Value>) -> Result<Value> {
     return exec_cmd(&mut bash_cmd, command, &args);
 }
 
-pub fn tab_all_lines(args: HashMap<String, Value>) -> Result<Value> {
+pub fn tab_all_lines(args: &HashMap<String, Value>) -> Result<Value> {
     if let Some(Value::String(lines)) = args.get("lines") {
         if let Some(Value::Number(num_spaces)) = args.get("num_spaces") {
             let num_spaces = num_spaces.as_u64().ok_or(Error::from(
@@ -33,19 +34,20 @@ pub fn tab_all_lines(args: HashMap<String, Value>) -> Result<Value> {
     }
 }
 
-pub fn str(args: HashMap<String, Value>) -> Result<Value> {
+pub fn str(args: &HashMap<String, Value>) -> Result<Value> {
     return Ok(Value::String(
-        args.get("value").expect("str: expected value argument").to_string(),
+        args.get("value").ok_or("str: expected value argument".to_owned())?.to_string(),
     ));
 }
 
-pub fn from_json(args: HashMap<String, Value>) -> Result<Value> {
+pub fn from_json(args: &HashMap<String, Value>) -> Result<Value> {
     let value = args
         .get("value")
-        .expect("from_json: expected value argument")
+        .ok_or("from_json: expected value argument".to_owned())?
         .to_string();
     let value = value
         .parse::<serde_json::Value>()
-        .expect(&format!("from_json: error parsing json : {}", value));
+        .context(format!("from_json: error parsing json : {}", value))
+        .map_err(|e| e.to_string())?;
     return Ok(value);
 }
