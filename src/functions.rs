@@ -34,6 +34,27 @@ pub fn tab_all_lines(args: &HashMap<String, Value>) -> Result<Value> {
     }
 }
 
+pub fn tab_all_lines_except_first(args: &HashMap<String, Value>) -> Result<Value> {
+    if let Some(Value::String(lines)) = args.get("lines") {
+        if let Some(Value::Number(num_spaces)) = args.get("num_spaces") {
+            let num_spaces = num_spaces.as_u64().ok_or(Error::from(
+                "tab_all_lines: Error number of spaces is not unsigned integer",
+            ))? as usize;
+            let spaces = " ".repeat(num_spaces);
+            let lines: Vec<_> = lines
+                .split('\n')
+                .enumerate()
+                .map(|(idx, line)| if idx == 0 { line.to_owned() } else { spaces.clone() + line })
+                .collect();
+            return Ok(Value::String(lines.join("\n")));
+        } else {
+            return Err("tab_all_lines: Invalid type for arg num_spaces, expected number".into());
+        }
+    } else {
+        return Err("tab_all_lines: Invalid type for arg lines, expected string".into());
+    }
+}
+
 pub fn str(args: &HashMap<String, Value>) -> Result<Value> {
     return Ok(Value::String(
         args.get("value").ok_or("str: expected value argument".to_owned())?.to_string(),

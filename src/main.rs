@@ -1,5 +1,3 @@
-#![feature(or_patterns)]
-
 use molysite::hcl::parse_hcl;
 use serde_json;
 use serde_yaml;
@@ -87,7 +85,7 @@ pub fn parse_args() -> Result<Config> {
                 let key = parts.pop().ok_or(anyhow!("Error no key=value found"))?;
                 let value = parts.pop().ok_or(anyhow!("Error no key=value found"))?;
 
-                if let Some((format, key)) = extract_format(key) {
+                if let Some((format, _)) = extract_format(key) {
                     process_inputs(&mut config, format, value.to_string()).context("Error processing inputs from --var arg")?;
                 } else {
                     config.context.insert(key, &value)
@@ -224,6 +222,7 @@ pub fn main() -> Result<()> {
     tera.register_filter("from_json", filters::from_json);
 
     tera.register_function("tab_all_lines", functions::tab_all_lines);
+    tera.register_function("tab_all_lines_except_first", functions::tab_all_lines_except_first);
     tera.register_function("bash", functions::bash);
     tera.register_function("str", functions::str);
     tera.register_function("to_json", functions::str);

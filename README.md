@@ -147,6 +147,7 @@ j2_render -f file.toml --print-ctx > file.json
 ### functions
 
 * "tab_all_lines"
+* "tab_all_lines_except_first"
 * "bash"
 * "str"
 * "to_json"
